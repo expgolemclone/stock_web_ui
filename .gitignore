@@ -12,6 +12,7 @@
 !docs/
 !docs/**
 !README.md
+!ARCHITECTURE.md
 # コンパイル済みJS（src_ts/*.ts から生成）
 docs/assets/stock-table.js
 !src_ts/
