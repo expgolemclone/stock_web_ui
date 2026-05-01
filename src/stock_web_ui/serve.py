@@ -10,8 +10,10 @@ import time
 from http.server import HTTPServer
 from pathlib import Path
 
+from stock_web_ui import ASSETS_DIR
 from stock_web_ui.config import BrowserConfig, ServerConfig, load_server_config
 from stock_web_ui.handler import RequestHandler, RouteConfig
+from stock_web_ui.page import IndexPage, render_index_html
 
 _IS_WINDOWS: bool = platform.system() == "Windows"
 _LISTEN_STATE: str = "0A"
@@ -24,37 +26,40 @@ _STARTUP_BROWSER_COMMAND: str = "xdg-open"
 def serve(
     *,
     static_root: Path,
-    index_path: Path,
+    index_page: IndexPage | None = None,
+    index_path: Path | None = None,
     browser_config: BrowserConfig | None = None,
     server_config: ServerConfig | None = None,
     api_routes: dict | None = None,
     yazi_base_dir: Path | None = None,
-    extra_static_roots: list[Path] | None = None,
 ) -> None:
     """Start the HTTP server and open a browser.
 
     Args:
-        static_root: Directory containing /assets/ files.
-        index_path: Path to index.html.
+        static_root: Project-specific directory containing /assets/ files.
+        index_page: Shared index.html template parameters.
+        index_path: Optional custom HTML file path for non-template callers.
         browser_config: Browser config (loads default if omitted).
         server_config: Server host/port (loads default if omitted).
         api_routes: Dict mapping "/api/..." paths to handler callables.
         yazi_base_dir: Base directory for yazi PDF integration (optional).
-        extra_static_roots: Additional directories allowed for symlink targets.
     """
     if server_config is None:
         server_config = load_server_config()
     if browser_config is None:
         from stock_web_ui.config import load_browser_config
         browser_config = load_browser_config()
+    if index_page is None and index_path is None:
+        raise ValueError("Either index_page or index_path must be provided")
+
+    index_html: bytes = render_index_html(index_page) if index_page is not None else index_path.read_bytes()
 
     RequestHandler.route_config = RouteConfig(
-        static_root=static_root,
-        index_path=index_path,
+        static_roots=_build_static_roots(static_root),
+        index_html=index_html,
         browser_config=browser_config,
         api_routes=api_routes or {},
         yazi_base_dir=yazi_base_dir,
-        extra_static_roots=extra_static_roots,
     )
 
     _release_port_if_needed(server_config.host, server_config.port)
@@ -64,6 +69,14 @@ def serve(
     print(f"Serving on {server_url}", flush=True)
     _open_startup_browser(server_url)
     httpd.serve_forever()
+
+
+def _build_static_roots(static_root: Path) -> list[Path]:
+    roots: list[Path] = []
+    for path in (static_root, ASSETS_DIR):
+        if path not in roots:
+            roots.append(path)
+    return roots
 
 
 def _release_port_if_needed(host: str, port: int) -> None:
@@ -241,6 +254,7 @@ def _open_startup_browser(url: str) -> None:
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                start_new_session=True,
             )
     except FileNotFoundError:
         print(

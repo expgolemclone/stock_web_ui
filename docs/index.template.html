@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <link rel="stylesheet" href="assets/style.css{{ASSET_VERSION_SUFFIX}}">
+    <script type="module" src="assets/stock-table.js{{ASSET_VERSION_SUFFIX}}"></script>
+    <script type="module" src="assets/app.js{{ASSET_VERSION_SUFFIX}}"></script>
+  </head>
+  <body>
+    <div class="container">
+      <nav id="tabBar" class="tab-bar" aria-label="{{TAB_ARIA_LABEL}}"></nav>
+
+      <div class="toolbar">
+        <p id="statusMessage" class="status-message" aria-live="polite">
+          {{STATUS_MESSAGE}}
+        </p>
+        <div id="toggleBar" class="column-toggles" aria-label="指標カラム表示切替"></div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="stockTable">
+          <thead>
+            <tr></tr>
+          </thead>
+          <tbody id="tbody">
+            <tr>
+              <td class="table-message" colspan="1">
+                {{STATUS_MESSAGE}}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

@@ -18,6 +18,11 @@ export interface MetricThreshold {
 }
 
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
+export type LinkMode = "direct" | "browser" | "yazi";
+
+export interface RenderContext {
+  githubPages: boolean;
+}
 
 export interface ColumnDef {
   key: string;
@@ -27,7 +32,8 @@ export interface ColumnDef {
   render: (row: Record<string, unknown>) => string;
   sortValue?: (row: Record<string, unknown>) => number | null;
   cssClass?: string;
-  url?: string;
+  linkHref?: (row: Record<string, unknown>, context: RenderContext) => string | null;
+  linkMode?: LinkMode | ((row: Record<string, unknown>, context: RenderContext) => LinkMode);
   browserKey?: string;
   isPosition?: boolean;
   toggleable?: boolean;
@@ -298,30 +304,51 @@ function _renderBody(rows: StockRow[]): void {
   }
   const cols: ColumnDef[] = _config.columns;
   const hidden: Set<string> = _state.hiddenCols;
-  const isGhPages: boolean = !!_config.githubPages;
+  const context: RenderContext = { githubPages: !!_config.githubPages };
 
   _el.tbody.innerHTML = rows.map(function (row: StockRow): string {
     const cells: string[] = cols.map(function (col: ColumnDef): string {
       const hiddenCls: string = hidden.has(col.key) ? " hidden-col" : "";
       const baseCls: string = col.cssClass || "";
       const extraCls: string = _metricCls(col, row);
-
-      if (col.type === "code") {
-        const monexUrl: string = "https://monex.ifis.co.jp/index.php?sa=report_zaimu&bcode=" + encodeURIComponent(row.code || "");
-        return '<td class="code' + hiddenCls + '"><a href="' + monexUrl + '" target="_blank" rel="noopener" data-browser="monex">' + escapeHtml(String(row.code || "")) + "</a></td>";
-      }
-
-      if (col.type === "name") {
-        const shikihoUrl: string = "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(row.code || "") + "/shikiho";
-        const nameHref: string = isGhPages ? shikihoUrl : "/open-yazi/" + encodeURIComponent(row.code || "");
-        const nameExtra: string = isGhPages ? "" : " data-yazi";
-        return '<td class="name' + hiddenCls + '"><a href="' + nameHref + '" target="_blank" rel="noopener"' + nameExtra + '>' + escapeHtml(col.render(row)) + "</a></td>";
-      }
-
-      return '<td class="' + baseCls + hiddenCls + extraCls + '">' + col.render(row) + "</td>";
+      const cellClass: string = [col.type, baseCls, hiddenCls.trim(), extraCls.trim()].filter(Boolean).join(" ");
+      return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
     });
     return "<tr>" + cells.join("") + "</tr>";
   }).join("");
+}
+
+function _renderCellContent(col: ColumnDef, row: StockRow, context: RenderContext): string {
+  const content: string = col.render(row);
+  if (!col.linkHref) {
+    return content;
+  }
+
+  const href: string | null = col.linkHref(row, context);
+  if (!href) {
+    return content;
+  }
+
+  const attrs: string[] = [
+    'href="' + escapeHtml(href) + '"',
+    'target="_blank"',
+    'rel="noopener"',
+  ];
+  const linkMode: LinkMode | undefined = _resolveLinkMode(col, row, context);
+  if (linkMode === "browser" && col.browserKey) {
+    attrs.push('data-browser="' + escapeHtml(col.browserKey) + '"');
+  } else if (linkMode === "yazi") {
+    attrs.push("data-yazi");
+  }
+
+  return "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+}
+
+function _resolveLinkMode(col: ColumnDef, row: StockRow, context: RenderContext): LinkMode | undefined {
+  if (!col.linkMode) {
+    return undefined;
+  }
+  return typeof col.linkMode === "function" ? col.linkMode(row, context) : col.linkMode;
 }
 
 function _renderMessageRow(message: string): void {

@@ -8,7 +8,7 @@ import subprocess
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, TypeAlias
 from urllib.parse import parse_qs, urlparse
 
 from stock_web_ui.browser import OpenResult, open_in_browser
@@ -21,30 +21,52 @@ _MIME_OVERRIDES: dict[str, str] = {
     ".pdf": "application/pdf",
 }
 
-ApiHandler = Callable[[BaseHTTPRequestHandler, dict[str, list[str]]], None]
+JsonScalar: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+QueryParams: TypeAlias = dict[str, list[str]]
+ApiHandler = Callable[["RequestHandler", QueryParams], None]
+JsonRoute: TypeAlias = Callable[[QueryParams], JsonValue]
+
+
+def send_json_response(
+    handler: BaseHTTPRequestHandler,
+    status_code: int,
+    body: JsonValue,
+) -> None:
+    payload: bytes = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(payload)))
+    handler.end_headers()
+    handler.wfile.write(payload)
+
+
+def json_route(route: JsonRoute, *, status_code: int = 200) -> ApiHandler:
+    def wrapped(handler: RequestHandler, query_params: QueryParams) -> None:
+        send_json_response(handler, status_code, route(query_params))
+
+    return wrapped
 
 
 class RouteConfig:
     """Immutable configuration for request routing."""
 
-    __slots__ = ("static_root", "index_path", "browser_config", "api_routes", "yazi_base_dir", "extra_static_roots")
+    __slots__ = ("static_roots", "index_html", "browser_config", "api_routes", "yazi_base_dir")
 
     def __init__(
         self,
         *,
-        static_root: Path,
-        index_path: Path,
+        static_roots: list[Path],
+        index_html: bytes,
         browser_config: BrowserConfig,
         api_routes: dict[str, ApiHandler] | None = None,
         yazi_base_dir: Path | None = None,
-        extra_static_roots: list[Path] | None = None,
     ) -> None:
-        self.static_root = static_root
-        self.index_path = index_path
+        self.static_roots = static_roots
+        self.index_html = index_html
         self.browser_config = browser_config
         self.api_routes: dict[str, ApiHandler] = api_routes or {}
         self.yazi_base_dir = yazi_base_dir
-        self.extra_static_roots: list[Path] = extra_static_roots or []
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -66,13 +88,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 query_params: dict[str, list[str]] = parse_qs(urlparse(self.path).query)
                 handler(self, query_params)
             else:
-                self._send_json_response(404, {"error": "Not found"})
+                self.send_json_response(404, {"error": "Not found"})
         elif parsed_url == "/":
-            self._serve_file(self.route_config.index_path, "text/html")
+            self._serve_bytes(self.route_config.index_html, "text/html")
         elif parsed_url.startswith("/assets/"):
             self._serve_asset(parsed_url)
         else:
-            self._send_json_response(404, {"error": "Not found"})
+            self.send_json_response(404, {"error": "Not found"})
 
     def _handle_open(self) -> None:
         query_params: dict[str, list[str]] = parse_qs(urlparse(self.path).query)
@@ -80,29 +102,29 @@ class RequestHandler(BaseHTTPRequestHandler):
         urls: list[str] = query_params.get("url", [])
 
         if not browser_keys or not urls:
-            self._send_json_response(400, {"error": "Missing browser or url parameter"})
+            self.send_json_response(400, {"error": "Missing browser or url parameter"})
             return
 
         result: OpenResult = open_in_browser(
             self.route_config.browser_config, browser_keys[0], urls[0],
         )
         status_code: int = 200 if result.success else 400
-        self._send_json_response(status_code, {"success": result.success, "message": result.message})
+        self.send_json_response(status_code, {"success": result.success, "message": result.message})
 
     def _handle_open_yazi(self, code: str) -> None:
         base_dir = self.route_config.yazi_base_dir
         if base_dir is None:
-            self._send_json_response(404, {"error": "Yazi integration not configured"})
+            self.send_json_response(404, {"error": "Yazi integration not configured"})
             return
 
         latest_dir: Path | None = _find_latest_quarter(base_dir)
         if latest_dir is None:
-            self._send_json_response(404, {"error": "Handbook data not found"})
+            self.send_json_response(404, {"error": "Handbook data not found"})
             return
 
         pdf_path: Path = latest_dir / f"{code}.pdf"
         if not pdf_path.is_file():
-            self._send_json_response(404, {"error": f"PDF not found: {code}"})
+            self.send_json_response(404, {"error": f"PDF not found: {code}"})
             return
 
         subprocess.Popen(
@@ -110,40 +132,30 @@ class RequestHandler(BaseHTTPRequestHandler):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        self._send_json_response(200, {"success": True, "message": f"Opened in yazi: {code}"})
+        self.send_json_response(200, {"success": True, "message": f"Opened in yazi: {code}"})
 
     def _serve_asset(self, parsed_url: str) -> None:
         filename: str = parsed_url[len("/assets/"):]
-        static_root: Path = self.route_config.static_root
-        file_path: Path = static_root / filename
-        if not file_path.is_file():
-            self._send_json_response(404, {"error": "Not found"})
+        file_path: Path | None = _resolve_asset_path(filename, self.route_config.static_roots)
+        if file_path is None:
+            self.send_json_response(404, {"error": "Not found"})
             return
-        allowed_roots: list[Path] = [static_root.resolve()] + [
-            r.resolve() for r in self.route_config.extra_static_roots
-        ]
-        resolved: Path = file_path.resolve()
-        if any(root in resolved.parents for root in allowed_roots):
-            content_type: str = _resolve_mime(file_path)
-            self._serve_file(file_path, content_type)
-        else:
-            self._send_json_response(403, {"error": "Forbidden"})
+        content_type: str = _resolve_mime(file_path)
+        self._serve_file(file_path, content_type)
 
     def _serve_file(self, path: Path, content_type: str) -> None:
         content: bytes = path.read_bytes()
+        self._serve_bytes(content, content_type)
+
+    def _serve_bytes(self, content: bytes, content_type: str) -> None:
         self.send_response(200)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
 
-    def _send_json_response(self, status_code: int, body: dict[str, str | bool]) -> None:
-        payload: bytes = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
+    def send_json_response(self, status_code: int, body: JsonValue) -> None:
+        send_json_response(self, status_code, body)
 
     def log_message(self, format: str, *args: str | int) -> None:
         print(f"[server] {args[0]} {args[1]}")
@@ -155,6 +167,18 @@ def _resolve_mime(path: Path) -> str:
         return _MIME_OVERRIDES[suffix]
     guessed: str | None = mimetypes.guess_type(str(path))[0]
     return guessed or "application/octet-stream"
+
+
+def _resolve_asset_path(filename: str, static_roots: list[Path]) -> Path | None:
+    for root in static_roots:
+        candidate: Path = root / filename
+        if not candidate.is_file():
+            continue
+        resolved: Path = candidate.resolve()
+        root_resolved: Path = root.resolve()
+        if resolved == root_resolved or root_resolved in resolved.parents:
+            return candidate
+    return None
 
 
 def _find_latest_quarter(base_dir: Path) -> Path | None:

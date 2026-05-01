@@ -1,0 +1,45 @@
+"""Tests for stock_web_ui config loading."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import stock_web_ui.config as config_mod
+
+
+def test_load_server_config_reads_config_dir(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "cli_defaults.toml").write_text(
+        "[server]\nhost = \"127.0.0.1\"\nport = 9999\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_mod, "CONFIG_DIR", tmp_path)
+
+    config = config_mod.load_server_config()
+
+    assert config.host == "127.0.0.1"
+    assert config.port == 9999
+
+
+def test_load_browser_config_reads_config_dir(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "magic_numbers.toml").write_text(
+        "\n".join(
+            [
+                "[browsers]",
+                "shikiho = \"google-chrome\"",
+                "monex = \"firefox\"",
+                "",
+                "[allowed_url_prefixes]",
+                "shikiho = \"https://shikiho.example/\"",
+                "monex = \"https://monex.example/\"",
+            ]
+        ) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_mod, "CONFIG_DIR", tmp_path)
+
+    config = config_mod.load_browser_config()
+
+    assert config.entries["shikiho"].command == "google-chrome"
+    assert config.entries["shikiho"].allowed_url_prefix == "https://shikiho.example/"
+    assert config.entries["monex"].command == "firefox"
+    assert config.entries["monex"].allowed_url_prefix == "https://monex.example/"

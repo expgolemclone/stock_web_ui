@@ -11,6 +11,29 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/stock_web_ui"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"config" = "stock_web_ui/config"
+"docs/assets" = "stock_web_ui/assets"
+"docs/index.template.html" = "stock_web_ui/templates/index.template.html"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/ARCHITECTURE.md",
+    "/README.md",
+    "/config",
+    "/docs/assets",
+    "/docs/index.html",
+    "/docs/index.template.html",
+    "/package-lock.json",
+    "/package.json",
+    "/pyproject.toml",
+    "/src",
+    "/src_ts",
+    "/tests",
+    "/tsconfig.json",
+    "/uv.lock",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

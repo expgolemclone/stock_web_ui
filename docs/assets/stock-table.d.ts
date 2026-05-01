@@ -11,6 +11,10 @@ export interface MetricThreshold {
     bad?: (v: number) => boolean;
 }
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
+export type LinkMode = "direct" | "browser" | "yazi";
+export interface RenderContext {
+    githubPages: boolean;
+}
 export interface ColumnDef {
     key: string;
     header: string;
@@ -19,7 +23,8 @@ export interface ColumnDef {
     render: (row: Record<string, unknown>) => string;
     sortValue?: (row: Record<string, unknown>) => number | null;
     cssClass?: string;
-    url?: string;
+    linkHref?: (row: Record<string, unknown>, context: RenderContext) => string | null;
+    linkMode?: LinkMode | ((row: Record<string, unknown>, context: RenderContext) => LinkMode);
     browserKey?: string;
     isPosition?: boolean;
     toggleable?: boolean;

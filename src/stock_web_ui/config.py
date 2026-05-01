@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TypedDict
 
-_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
-_CONFIG_DIR: Path = _PROJECT_ROOT / "config"
+from stock_web_ui import CONFIG_DIR
 
 
 class _ServerSection(TypedDict):
@@ -82,6 +80,6 @@ def load_browser_config() -> BrowserConfig:
 
 
 def _load_toml[T](filename: str) -> T:
-    toml_path: Path = _CONFIG_DIR / filename
+    toml_path = CONFIG_DIR / filename
     with toml_path.open("rb") as f:
         return tomllib.load(f)  # type: ignore[return-value]
