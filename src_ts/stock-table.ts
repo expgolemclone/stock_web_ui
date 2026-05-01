@@ -124,7 +124,8 @@ function init(config: StockTableConfig): void {
   _config = config;
   _state.sortKey = config.defaultSortKey;
   _state.sortDir = config.defaultSortDirection;
-  _state.hiddenCols = _loadHiddenCols();
+  _state.hiddenCols = _sanitizeHiddenCols(_loadHiddenCols());
+  _saveHiddenCols(_state.hiddenCols);
 
   _el.tabBar = document.getElementById("tabBar");
   _el.status = document.getElementById("statusMessage");
@@ -132,7 +133,6 @@ function init(config: StockTableConfig): void {
   _el.tbody = document.getElementById("tbody");
   _el.toggleBar = document.getElementById("toggleBar");
 
-  _renderHead();
   _renderToggleChips();
   _bindEvents();
   _render();
@@ -230,6 +230,7 @@ function _resolveDefaultTab(rows: StockRow[]): string {
 /* ------------------------------------------------------------------ */
 
 function _render(): void {
+  _renderHead();
   _renderTabs();
   _renderSortButtons();
   _renderToggleChips();
@@ -271,11 +272,9 @@ function _renderHead(): void {
   for (const col of _config ? _config.columns : []) {
     const th: HTMLTableCellElement = document.createElement("th");
     th.scope = "col";
+    th.className = _getColumnClassName(col, "th");
     if (col.title) {
       th.title = col.title;
-    }
-    if (col.isPosition) {
-      th.className = "column-position";
     }
     th.dataset.columnKey = col.key;
 
@@ -303,15 +302,12 @@ function _renderBody(rows: StockRow[]): void {
     return;
   }
   const cols: ColumnDef[] = _config.columns;
-  const hidden: Set<string> = _state.hiddenCols;
   const context: RenderContext = { githubPages: !!_config.githubPages };
 
   _el.tbody.innerHTML = rows.map(function (row: StockRow): string {
     const cells: string[] = cols.map(function (col: ColumnDef): string {
-      const hiddenCls: string = hidden.has(col.key) ? " hidden-col" : "";
-      const baseCls: string = col.cssClass || "";
       const extraCls: string = _metricCls(col, row);
-      const cellClass: string = [col.type, baseCls, hiddenCls.trim(), extraCls.trim()].filter(Boolean).join(" ");
+      const cellClass: string = _getColumnClassName(col, "td", extraCls);
       return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
     });
     return "<tr>" + cells.join("") + "</tr>";
@@ -404,10 +400,10 @@ function _renderToggleChips(): void {
   if (!_el.toggleBar || !_config) {
     return;
   }
-  const toggleable: ColumnDef[] = _config.columns.filter(function (c: ColumnDef): boolean { return !!c.toggleable; });
+  const toggleable: ColumnDef[] = _getHideableColumns();
 
   _el.toggleBar.innerHTML = toggleable.map(function (col: ColumnDef): string {
-    const isActive: boolean = !_state.hiddenCols.has(col.key);
+    const isActive: boolean = !_isColumnHidden(col.key);
     return '<button class="toggle-chip' + (isActive ? " active" : "") + '" type="button" data-toggle-column="' + escapeHtml(col.key) + '">' + escapeHtml(col.header) + "</button>";
   }).join("");
 }
@@ -493,6 +489,60 @@ function _findColumn(key: string): ColumnDef | null {
   return null;
 }
 
+function _getHideableColumns(): ColumnDef[] {
+  if (!_config) {
+    return [];
+  }
+  return _config.columns.filter(function (col: ColumnDef): boolean {
+    return _isColumnHideable(col);
+  });
+}
+
+function _isColumnHideable(col: ColumnDef): boolean {
+  return !!_config && !!col.toggleable && col.key !== _config.defaultSortKey;
+}
+
+function _sanitizeHiddenCols(cols: Set<string>): Set<string> {
+  const hideableKeys: Set<string> = new Set(_getHideableColumns().map(function (col: ColumnDef): string {
+    return col.key;
+  }));
+  return new Set(Array.from(cols).filter(function (key: string): boolean {
+    return hideableKeys.has(key);
+  }));
+}
+
+function _isColumnHidden(key: string): boolean {
+  return _state.hiddenCols.has(key);
+}
+
+function _getColumnClassName(col: ColumnDef, element: "th" | "td", extraClass?: string): string {
+  const classes: string[] = [];
+  if (element === "td") {
+    classes.push(col.type);
+  }
+  if (col.cssClass) {
+    classes.push(col.cssClass);
+  }
+  if (col.isPosition) {
+    classes.push("column-position");
+  }
+  if (_isColumnHidden(col.key)) {
+    classes.push("hidden-col");
+  }
+  if (extraClass) {
+    classes.push(extraClass.trim());
+  }
+  return classes.filter(Boolean).join(" ");
+}
+
+function _resetSortToDefault(): void {
+  if (!_config) {
+    return;
+  }
+  _state.sortKey = _config.defaultSortKey;
+  _state.sortDir = _config.defaultSortDirection;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Event binding                                                      */
 /* ------------------------------------------------------------------ */
@@ -528,11 +578,19 @@ function _bindEvents(): void {
       if (!col) {
         return;
       }
+      const columnDef: ColumnDef | null = _findColumn(col);
+      if (!columnDef || !_isColumnHideable(columnDef)) {
+        return;
+      }
       if (_state.hiddenCols.has(col)) {
         _state.hiddenCols.delete(col);
       } else {
         _state.hiddenCols.add(col);
+        if (_state.sortKey === col) {
+          _resetSortToDefault();
+        }
       }
+      _state.hiddenCols = _sanitizeHiddenCols(_state.hiddenCols);
       _saveHiddenCols(_state.hiddenCols);
       _render();
     });
@@ -550,8 +608,7 @@ function _bindEvents(): void {
         return;
       }
       _state.currentTab = key;
-      _state.sortKey = _config ? _config.defaultSortKey : "";
-      _state.sortDir = _config ? _config.defaultSortDirection : "asc";
+      _resetSortToDefault();
       _render();
     });
   }

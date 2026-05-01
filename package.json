@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "build:assets": "tsc",
+    "test:ui": "node --no-warnings --test tests/*.mjs",
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
+    "jsdom": "^29.1.1",
     "typescript": "^6.0.3"
   }
 }

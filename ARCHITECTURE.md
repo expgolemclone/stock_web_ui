@@ -48,6 +48,8 @@ stock_web_ui/
 - `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。
 - URL 生成は共通ライブラリに埋め込まず、`ColumnDef.linkHref(row, context)` と `linkMode` / `browserKey` で利用側へ委譲する。
 - `RenderContext.githubPages` により、同じカラム定義から「ローカルでは `/open-yazi`」「静的配信では外部 URL」などを切り替えられる。
+- 列の表示切替は `hiddenColumns` を `localStorage` に保存し、見出し (`th`)・本文セル (`td`)・トグル状態へ同じ規則で反映する。
+- `defaultSortKey` の列は表示切替対象に含めず、現在ソート中の列を非表示にした場合は既定ソートへ戻す。
 - ES Modules (`type="module"`) を使い、バンドラなしで動かす。
 
 ## HTTP サーバー
@@ -64,3 +66,4 @@ stock_web_ui/
 - `tests/test_config.py`: package data からの設定読込
 - `tests/test_handler.py`: JSON 応答 helper と静的資産解決
 - `tests/test_page.py`: 共通 index テンプレート描画
+- `tests/stock-table.test.mjs`: `jsdom` 上で共有ランタイムの列表示切替、hidden state 正規化、ソート復帰を検証

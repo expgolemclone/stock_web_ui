@@ -43,13 +43,13 @@ function init(config) {
     _config = config;
     _state.sortKey = config.defaultSortKey;
     _state.sortDir = config.defaultSortDirection;
-    _state.hiddenCols = _loadHiddenCols();
+    _state.hiddenCols = _sanitizeHiddenCols(_loadHiddenCols());
+    _saveHiddenCols(_state.hiddenCols);
     _el.tabBar = document.getElementById("tabBar");
     _el.status = document.getElementById("statusMessage");
     _el.thead = document.querySelector("#stockTable > thead");
     _el.tbody = document.getElementById("tbody");
     _el.toggleBar = document.getElementById("toggleBar");
-    _renderHead();
     _renderToggleChips();
     _bindEvents();
     _render();
@@ -136,6 +136,7 @@ function _resolveDefaultTab(rows) {
 /*  Rendering                                                          */
 /* ------------------------------------------------------------------ */
 function _render() {
+    _renderHead();
     _renderTabs();
     _renderSortButtons();
     _renderToggleChips();
@@ -170,11 +171,9 @@ function _renderHead() {
     for (const col of _config ? _config.columns : []) {
         const th = document.createElement("th");
         th.scope = "col";
+        th.className = _getColumnClassName(col, "th");
         if (col.title) {
             th.title = col.title;
-        }
-        if (col.isPosition) {
-            th.className = "column-position";
         }
         th.dataset.columnKey = col.key;
         const btn = document.createElement("button");
@@ -199,14 +198,11 @@ function _renderBody(rows) {
         return;
     }
     const cols = _config.columns;
-    const hidden = _state.hiddenCols;
     const context = { githubPages: !!_config.githubPages };
     _el.tbody.innerHTML = rows.map(function (row) {
         const cells = cols.map(function (col) {
-            const hiddenCls = hidden.has(col.key) ? " hidden-col" : "";
-            const baseCls = col.cssClass || "";
             const extraCls = _metricCls(col, row);
-            const cellClass = [col.type, baseCls, hiddenCls.trim(), extraCls.trim()].filter(Boolean).join(" ");
+            const cellClass = _getColumnClassName(col, "td", extraCls);
             return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
         });
         return "<tr>" + cells.join("") + "</tr>";
@@ -289,9 +285,9 @@ function _renderToggleChips() {
     if (!_el.toggleBar || !_config) {
         return;
     }
-    const toggleable = _config.columns.filter(function (c) { return !!c.toggleable; });
+    const toggleable = _getHideableColumns();
     _el.toggleBar.innerHTML = toggleable.map(function (col) {
-        const isActive = !_state.hiddenCols.has(col.key);
+        const isActive = !_isColumnHidden(col.key);
         return '<button class="toggle-chip' + (isActive ? " active" : "") + '" type="button" data-toggle-column="' + escapeHtml(col.key) + '">' + escapeHtml(col.header) + "</button>";
     }).join("");
 }
@@ -367,6 +363,54 @@ function _findColumn(key) {
     }
     return null;
 }
+function _getHideableColumns() {
+    if (!_config) {
+        return [];
+    }
+    return _config.columns.filter(function (col) {
+        return _isColumnHideable(col);
+    });
+}
+function _isColumnHideable(col) {
+    return !!_config && !!col.toggleable && col.key !== _config.defaultSortKey;
+}
+function _sanitizeHiddenCols(cols) {
+    const hideableKeys = new Set(_getHideableColumns().map(function (col) {
+        return col.key;
+    }));
+    return new Set(Array.from(cols).filter(function (key) {
+        return hideableKeys.has(key);
+    }));
+}
+function _isColumnHidden(key) {
+    return _state.hiddenCols.has(key);
+}
+function _getColumnClassName(col, element, extraClass) {
+    const classes = [];
+    if (element === "td") {
+        classes.push(col.type);
+    }
+    if (col.cssClass) {
+        classes.push(col.cssClass);
+    }
+    if (col.isPosition) {
+        classes.push("column-position");
+    }
+    if (_isColumnHidden(col.key)) {
+        classes.push("hidden-col");
+    }
+    if (extraClass) {
+        classes.push(extraClass.trim());
+    }
+    return classes.filter(Boolean).join(" ");
+}
+function _resetSortToDefault() {
+    if (!_config) {
+        return;
+    }
+    _state.sortKey = _config.defaultSortKey;
+    _state.sortDir = _config.defaultSortDirection;
+}
 /* ------------------------------------------------------------------ */
 /*  Event binding                                                      */
 /* ------------------------------------------------------------------ */
@@ -401,12 +445,20 @@ function _bindEvents() {
             if (!col) {
                 return;
             }
+            const columnDef = _findColumn(col);
+            if (!columnDef || !_isColumnHideable(columnDef)) {
+                return;
+            }
             if (_state.hiddenCols.has(col)) {
                 _state.hiddenCols.delete(col);
             }
             else {
                 _state.hiddenCols.add(col);
+                if (_state.sortKey === col) {
+                    _resetSortToDefault();
+                }
             }
+            _state.hiddenCols = _sanitizeHiddenCols(_state.hiddenCols);
             _saveHiddenCols(_state.hiddenCols);
             _render();
         });
@@ -423,8 +475,7 @@ function _bindEvents() {
                 return;
             }
             _state.currentTab = key;
-            _state.sortKey = _config ? _config.defaultSortKey : "";
-            _state.sortDir = _config ? _config.defaultSortDirection : "asc";
+            _resetSortToDefault();
             _render();
         });
     }
