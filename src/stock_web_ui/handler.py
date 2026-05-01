@@ -27,7 +27,7 @@ ApiHandler = Callable[[BaseHTTPRequestHandler, dict[str, list[str]]], None]
 class RouteConfig:
     """Immutable configuration for request routing."""
 
-    __slots__ = ("static_root", "index_path", "browser_config", "api_routes", "yazi_base_dir")
+    __slots__ = ("static_root", "index_path", "browser_config", "api_routes", "yazi_base_dir", "extra_static_roots")
 
     def __init__(
         self,
@@ -37,12 +37,14 @@ class RouteConfig:
         browser_config: BrowserConfig,
         api_routes: dict[str, ApiHandler] | None = None,
         yazi_base_dir: Path | None = None,
+        extra_static_roots: list[Path] | None = None,
     ) -> None:
         self.static_root = static_root
         self.index_path = index_path
         self.browser_config = browser_config
         self.api_routes: dict[str, ApiHandler] = api_routes or {}
         self.yazi_base_dir = yazi_base_dir
+        self.extra_static_roots: list[Path] = extra_static_roots or []
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -114,11 +116,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         filename: str = parsed_url[len("/assets/"):]
         static_root: Path = self.route_config.static_root
         file_path: Path = static_root / filename
-        if file_path.is_file() and static_root in file_path.resolve().parents:
+        if not file_path.is_file():
+            self._send_json_response(404, {"error": "Not found"})
+            return
+        allowed_roots: list[Path] = [static_root.resolve()] + [
+            r.resolve() for r in self.route_config.extra_static_roots
+        ]
+        resolved: Path = file_path.resolve()
+        if any(root in resolved.parents for root in allowed_roots):
             content_type: str = _resolve_mime(file_path)
             self._serve_file(file_path, content_type)
         else:
-            self._send_json_response(404, {"error": "Not found"})
+            self._send_json_response(403, {"error": "Forbidden"})
 
     def _serve_file(self, path: Path, content_type: str) -> None:
         content: bytes = path.read_bytes()

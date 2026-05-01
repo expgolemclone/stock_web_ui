@@ -18,7 +18,7 @@ _LISTEN_STATE: str = "0A"
 _PROC_PATH: Path = Path("/proc")
 _TERM_TIMEOUT_SECONDS: float = 1.0
 _POLL_INTERVAL_SECONDS: float = 0.1
-_STARTUP_BROWSER_COMMAND: str = "google-chrome"
+_STARTUP_BROWSER_COMMAND: str = "xdg-open"
 
 
 def serve(
@@ -29,6 +29,7 @@ def serve(
     server_config: ServerConfig | None = None,
     api_routes: dict | None = None,
     yazi_base_dir: Path | None = None,
+    extra_static_roots: list[Path] | None = None,
 ) -> None:
     """Start the HTTP server and open a browser.
 
@@ -39,6 +40,7 @@ def serve(
         server_config: Server host/port (loads default if omitted).
         api_routes: Dict mapping "/api/..." paths to handler callables.
         yazi_base_dir: Base directory for yazi PDF integration (optional).
+        extra_static_roots: Additional directories allowed for symlink targets.
     """
     if server_config is None:
         server_config = load_server_config()
@@ -52,13 +54,14 @@ def serve(
         browser_config=browser_config,
         api_routes=api_routes or {},
         yazi_base_dir=yazi_base_dir,
+        extra_static_roots=extra_static_roots,
     )
 
     _release_port_if_needed(server_config.host, server_config.port)
     address: tuple[str, int] = (server_config.host, server_config.port)
     httpd: HTTPServer = HTTPServer(address, RequestHandler)
     server_url: str = f"http://{server_config.host}:{server_config.port}"
-    print(f"Serving on {server_url}")
+    print(f"Serving on {server_url}", flush=True)
     _open_startup_browser(server_url)
     httpd.serve_forever()
 
@@ -238,7 +241,6 @@ def _open_startup_browser(url: str) -> None:
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True,
             )
     except FileNotFoundError:
         print(
