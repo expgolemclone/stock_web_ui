@@ -11,6 +11,14 @@
 !src/**
 !docs/
 !docs/**
+!README.md
+# コンパイル済みJS（src_ts/*.ts から生成）
+docs/assets/stock-table.js
+!src_ts/
+!src_ts/**
+!tsconfig.json
+!package.json
+!package-lock.json
 !tests/
 !tests/**
 
