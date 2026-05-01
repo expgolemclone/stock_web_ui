@@ -35,17 +35,19 @@ stock_web_ui/
 - wheel ビルド時は `config/`, `docs/assets/`, `docs/index.template.html` を package data として `stock_web_ui/` 配下へ同梱する。
 - 実行時のパス解決は `stock_web_ui.__init__` が担当し、install 済み環境では package data を、editable / source tree ではリポジトリ直下の `config/` と `docs/` を参照する。
 - `docs/assets/stock-table.js` は配布物の一部として Git 管理する。これにより wheel 生成時に「事前に別プロジェクトで tsc を回しておく」前提をなくす。
+- `docs/assets/` は `stock_web_ui` 自身の GitHub Pages からも配信され、利用側の静的サイトが共有 runtime / style の正規 URL として直接参照できる。
 
 ## 利用側との境界
 
 - 利用側プロジェクトは `stock-web-ui` を path dependency として参照する。
 - ローカル HTTP サーバーは「利用側 `docs/assets/` を優先し、足りない共有資産は `stock_web_ui.ASSETS_DIR` からフォールバックする」構成で動く。利用側は `_PACKAGE_ASSETS` のようなパス逆算をしない。
-- 利用側 `docs/index.html` は `python -m stock_web_ui.render_index ...` で共通テンプレートから生成できる。
-- `docs/assets/stock-table.js`, `docs/assets/style.css`, `src_ts/stock-table.d.ts` を利用側へコピーしておけば、GitHub Pages のような静的配信でも symlink なしで動く。
+- 利用側 `docs/index.html` は `python -m stock_web_ui.render_index ...` で共通テンプレートから生成でき、`--shared-asset-base-url` で共有 runtime / style の参照先を外部 URL に切り替えられる。
+- 利用側は `docs/assets/app.js` とデータだけを保持し、共有 runtime / style のローカルコピーは持たなくてよい。
 
 ## フロントエンド
 
 - `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。
+- `stock-table.js` は ESM として配信される一方で `globalThis.StockTable` にも公開され、利用側 `app.js` はこの共有 API を前提に起動する。
 - URL 生成は共通ライブラリに埋め込まず、`ColumnDef.linkHref(row, context)` と `linkMode` / `browserKey` で利用側へ委譲する。
 - `RenderContext.githubPages` により、同じカラム定義から「ローカルでは `/open-yazi`」「静的配信では外部 URL」などを切り替えられる。
 - 列の表示切替は `hiddenColumns` を `localStorage` に保存し、見出し (`th`)・本文セル (`td`)・トグル状態へ同じ規則で反映する。
@@ -55,6 +57,7 @@ stock_web_ui/
 ## HTTP サーバー
 
 - `serve()` は `IndexPage` を受け取り、共通テンプレートから `index.html` をレンダリングして返す。必要なら `index_path` も使える。
+- `IndexPage.shared_asset_base_url` を省略するとローカル相対の `assets/*` を使い、指定すると共有 runtime / style の script/link をその URL へ向ける。
 - `handler.py` は公開ヘルパーとして `send_json_response()` と `json_route()` を提供する。利用側は `BaseHTTPRequestHandler` のヘッダ送信を手書きしなくてよい。
 - `/open` は `BrowserConfig` の allowlist を通した URL だけを外部ブラウザで開く。
 - `/open-yazi/{code}` は四季報 PDF 連携用のオプション機能で、利用側が `yazi_base_dir` を渡したときだけ有効になる。

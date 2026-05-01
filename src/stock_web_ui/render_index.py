@@ -14,6 +14,7 @@ def main() -> None:
     parser.add_argument("--loading-message", default="データを読み込み中です。")
     parser.add_argument("--tab-aria-label", default="タブ切替")
     parser.add_argument("--asset-version", default="")
+    parser.add_argument("--shared-asset-base-url", default="")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -26,6 +27,7 @@ def main() -> None:
                 loading_message=args.loading_message,
                 tab_aria_label=args.tab_aria_label,
                 asset_version=args.asset_version,
+                shared_asset_base_url=args.shared_asset_base_url,
             )
         )
     )

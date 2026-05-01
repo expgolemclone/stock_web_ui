@@ -36,6 +36,8 @@ const _el = {
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 export const StockTable = { init };
+const _globalScope = globalThis;
+_globalScope.StockTable = StockTable;
 /* ------------------------------------------------------------------ */
 /*  Initialisation                                                     */
 /* ------------------------------------------------------------------ */

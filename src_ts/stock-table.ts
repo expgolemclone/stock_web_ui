@@ -116,6 +116,9 @@ const _el: Elements = {
 
 export const StockTable = { init };
 
+const _globalScope = globalThis as typeof globalThis & { StockTable?: typeof StockTable };
+_globalScope.StockTable = StockTable;
+
 /* ------------------------------------------------------------------ */
 /*  Initialisation                                                     */
 /* ------------------------------------------------------------------ */
