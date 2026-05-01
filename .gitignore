@@ -1,0 +1,19 @@
+# ホワイトリスト方式: デフォルト全無視
+*
+
+# 許可するファイル
+!.gitignore
+!pyproject.toml
+!uv.lock
+!config/
+!config/**
+!src/
+!src/**
+!docs/
+!docs/**
+!tests/
+!tests/**
+
+# バイナリ・キャッシュは常に除外
+__pycache__/
+*.pyc
