@@ -12,6 +12,7 @@ export interface MetricThreshold {
 }
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
 export type LinkMode = "direct" | "browser" | "yazi";
+export type StockLink = "monex" | "shikiho" | "yazi";
 export interface RenderContext {
     githubPages: boolean;
 }
@@ -23,6 +24,7 @@ export interface ColumnDef {
     render: (row: Record<string, unknown>) => string;
     sortValue?: (row: Record<string, unknown>) => number | null;
     cssClass?: string;
+    stockLink?: StockLink;
     linkHref?: (row: Record<string, unknown>, context: RenderContext) => string | null;
     linkMode?: LinkMode | ((row: Record<string, unknown>, context: RenderContext) => LinkMode);
     browserKey?: string;

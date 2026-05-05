@@ -19,6 +19,7 @@ export interface MetricThreshold {
 
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
 export type LinkMode = "direct" | "browser" | "yazi";
+export type StockLink = "monex" | "shikiho" | "yazi";
 
 export interface RenderContext {
   githubPages: boolean;
@@ -32,6 +33,7 @@ export interface ColumnDef {
   render: (row: Record<string, unknown>) => string;
   sortValue?: (row: Record<string, unknown>) => number | null;
   cssClass?: string;
+  stockLink?: StockLink;
   linkHref?: (row: Record<string, unknown>, context: RenderContext) => string | null;
   linkMode?: LinkMode | ((row: Record<string, unknown>, context: RenderContext) => LinkMode);
   browserKey?: string;
@@ -75,6 +77,12 @@ interface Elements {
   thead: HTMLTableSectionElement | null;
   tbody: HTMLElement | null;
   toggleBar: HTMLElement | null;
+}
+
+interface ResolvedLink {
+  href: string;
+  linkMode?: LinkMode;
+  browserKey?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -319,28 +327,43 @@ function _renderBody(rows: StockRow[]): void {
 
 function _renderCellContent(col: ColumnDef, row: StockRow, context: RenderContext): string {
   const content: string = col.render(row);
-  if (!col.linkHref) {
-    return content;
-  }
-
-  const href: string | null = col.linkHref(row, context);
-  if (!href) {
+  const resolvedLink: ResolvedLink | null = _resolveColumnLink(col, row, context);
+  if (resolvedLink === null) {
     return content;
   }
 
   const attrs: string[] = [
-    'href="' + escapeHtml(href) + '"',
+    'href="' + escapeHtml(resolvedLink.href) + '"',
     'target="_blank"',
     'rel="noopener"',
   ];
-  const linkMode: LinkMode | undefined = _resolveLinkMode(col, row, context);
-  if (linkMode === "browser" && col.browserKey) {
-    attrs.push('data-browser="' + escapeHtml(col.browserKey) + '"');
-  } else if (linkMode === "yazi") {
+  if (resolvedLink.linkMode === "browser" && resolvedLink.browserKey) {
+    attrs.push('data-browser="' + escapeHtml(resolvedLink.browserKey) + '"');
+  } else if (resolvedLink.linkMode === "yazi") {
     attrs.push("data-yazi");
   }
 
   return "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+}
+
+function _resolveColumnLink(col: ColumnDef, row: StockRow, context: RenderContext): ResolvedLink | null {
+  if (col.stockLink) {
+    return _resolveStockLink(col.stockLink, row, context);
+  }
+  if (!col.linkHref) {
+    return null;
+  }
+
+  const href: string | null = col.linkHref(row, context);
+  if (!href) {
+    return null;
+  }
+
+  return {
+    href,
+    linkMode: _resolveLinkMode(col, row, context),
+    browserKey: col.browserKey,
+  };
 }
 
 function _resolveLinkMode(col: ColumnDef, row: StockRow, context: RenderContext): LinkMode | undefined {
@@ -348,6 +371,43 @@ function _resolveLinkMode(col: ColumnDef, row: StockRow, context: RenderContext)
     return undefined;
   }
   return typeof col.linkMode === "function" ? col.linkMode(row, context) : col.linkMode;
+}
+
+function _resolveStockLink(stockLink: StockLink, row: StockRow, context: RenderContext): ResolvedLink | null {
+  const code: string = String(row.code ?? "");
+  if (!code) {
+    return null;
+  }
+
+  if (stockLink === "yazi") {
+    if (context.githubPages) {
+      return null;
+    }
+    return {
+      href: "/open-yazi/" + encodeURIComponent(code),
+      linkMode: "yazi",
+    };
+  }
+
+  const href: string = stockLink === "monex"
+    ? _buildMonexUrl(code)
+    : _buildShikihoUrl(code);
+  if (context.githubPages) {
+    return { href, linkMode: "direct" };
+  }
+  return {
+    href,
+    linkMode: "browser",
+    browserKey: stockLink,
+  };
+}
+
+function _buildMonexUrl(code: string): string {
+  return "https://monex.ifis.co.jp/index.php?sa=report_zaimu&bcode=" + encodeURIComponent(code);
+}
+
+function _buildShikihoUrl(code: string): string {
+  return "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(code) + "/shikiho";
 }
 
 function _renderMessageRow(message: string): void {

@@ -212,32 +212,77 @@ function _renderBody(rows) {
 }
 function _renderCellContent(col, row, context) {
     const content = col.render(row);
-    if (!col.linkHref) {
-        return content;
-    }
-    const href = col.linkHref(row, context);
-    if (!href) {
+    const resolvedLink = _resolveColumnLink(col, row, context);
+    if (resolvedLink === null) {
         return content;
     }
     const attrs = [
-        'href="' + escapeHtml(href) + '"',
+        'href="' + escapeHtml(resolvedLink.href) + '"',
         'target="_blank"',
         'rel="noopener"',
     ];
-    const linkMode = _resolveLinkMode(col, row, context);
-    if (linkMode === "browser" && col.browserKey) {
-        attrs.push('data-browser="' + escapeHtml(col.browserKey) + '"');
+    if (resolvedLink.linkMode === "browser" && resolvedLink.browserKey) {
+        attrs.push('data-browser="' + escapeHtml(resolvedLink.browserKey) + '"');
     }
-    else if (linkMode === "yazi") {
+    else if (resolvedLink.linkMode === "yazi") {
         attrs.push("data-yazi");
     }
     return "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+}
+function _resolveColumnLink(col, row, context) {
+    if (col.stockLink) {
+        return _resolveStockLink(col.stockLink, row, context);
+    }
+    if (!col.linkHref) {
+        return null;
+    }
+    const href = col.linkHref(row, context);
+    if (!href) {
+        return null;
+    }
+    return {
+        href,
+        linkMode: _resolveLinkMode(col, row, context),
+        browserKey: col.browserKey,
+    };
 }
 function _resolveLinkMode(col, row, context) {
     if (!col.linkMode) {
         return undefined;
     }
     return typeof col.linkMode === "function" ? col.linkMode(row, context) : col.linkMode;
+}
+function _resolveStockLink(stockLink, row, context) {
+    const code = String(row.code ?? "");
+    if (!code) {
+        return null;
+    }
+    if (stockLink === "yazi") {
+        if (context.githubPages) {
+            return null;
+        }
+        return {
+            href: "/open-yazi/" + encodeURIComponent(code),
+            linkMode: "yazi",
+        };
+    }
+    const href = stockLink === "monex"
+        ? _buildMonexUrl(code)
+        : _buildShikihoUrl(code);
+    if (context.githubPages) {
+        return { href, linkMode: "direct" };
+    }
+    return {
+        href,
+        linkMode: "browser",
+        browserKey: stockLink,
+    };
+}
+function _buildMonexUrl(code) {
+    return "https://monex.ifis.co.jp/index.php?sa=report_zaimu&bcode=" + encodeURIComponent(code);
+}
+function _buildShikihoUrl(code) {
+    return "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(code) + "/shikiho";
 }
 function _renderMessageRow(message) {
     if (!_el.tbody || !_config) {

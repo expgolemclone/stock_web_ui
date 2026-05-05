@@ -48,8 +48,9 @@ stock_web_ui/
 
 - `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。
 - `stock-table.js` は ESM として配信される一方で `globalThis.StockTable` にも公開され、利用側 `app.js` はこの共有 API を前提に起動する。
-- URL 生成は共通ライブラリに埋め込まず、`ColumnDef.linkHref(row, context)` と `linkMode` / `browserKey` で利用側へ委譲する。
-- `RenderContext.githubPages` により、同じカラム定義から「ローカルでは `/open-yazi`」「静的配信では外部 URL」などを切り替えられる。
+- 共通リンクは `ColumnDef.stockLink` (`monex` / `shikiho` / `yazi`) で指定できる。runtime が `row.code` と `RenderContext.githubPages` から `href` / `linkMode` / `browserKey` を解決する。
+- 既存の `ColumnDef.linkHref(row, context)` と `linkMode` / `browserKey` も後方互換のため維持し、`stockLink` を使わない利用側は従来どおり個別定義できる。
+- `RenderContext.githubPages` により、同じカラム定義から「ローカルでは `/open-yazi`」「静的配信では四季報 URL」「静的配信では yazi 列を非リンク化」などを切り替えられる。
 - 列の表示切替は `hiddenColumns` を `localStorage` に保存し、見出し (`th`)・本文セル (`td`)・トグル状態へ同じ規則で反映する。
 - `defaultSortKey` の列は表示切替対象に含めず、現在ソート中の列を非表示にした場合は既定ソートへ戻す。
 - ES Modules (`type="module"`) を使い、バンドラなしで動かす。

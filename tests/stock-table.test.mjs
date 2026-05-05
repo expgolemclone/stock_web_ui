@@ -43,7 +43,7 @@ function createColumns({ defaultColumnToggleable = false } = {}) {
   ];
 }
 
-function createConfig(columns) {
+function createConfig(columns, { githubPages = false } = {}) {
   return {
     defaultTitle: '銘柄一覧',
     dataUrl: '/api/stocks',
@@ -51,6 +51,7 @@ function createConfig(columns) {
     metricThresholds: {},
     defaultSortKey: 'code',
     defaultSortDirection: 'desc',
+    githubPages,
   };
 }
 
@@ -79,7 +80,12 @@ async function flushAsync() {
   });
 }
 
-async function setupTable({ rows = BASE_ROWS, storedHiddenColumns = null, columns = createColumns() } = {}) {
+async function setupTable({
+  rows = BASE_ROWS,
+  storedHiddenColumns = null,
+  columns = createColumns(),
+  githubPages = false,
+} = {}) {
   const dom = new JSDOM(
     `<!DOCTYPE html>
     <html lang="ja">
@@ -150,7 +156,7 @@ async function setupTable({ rows = BASE_ROWS, storedHiddenColumns = null, column
   }
 
   const { StockTable } = await loadStockTableModule();
-  StockTable.init(createConfig(columns));
+  StockTable.init(createConfig(columns, { githubPages }));
   await flushAsync();
 
   return {
@@ -191,6 +197,12 @@ function getFirstCellText(document, key) {
   const cells = getColumnCells(document, key);
   assert.ok(cells.length > 0, `column ${key} should have cells`);
   return cells[0].textContent.trim();
+}
+
+function getFirstCellAnchor(document, key) {
+  const cells = getColumnCells(document, key);
+  assert.ok(cells.length > 0, `column ${key} should have cells`);
+  return cells[0].querySelector('a');
 }
 
 function click(window, element) {
@@ -246,4 +258,92 @@ test('保存済み hidden state を正規化し既定ソート列をトグル対
   assert.equal(getToggleChip(page.document, 'code'), null);
   assert.ok(getToggleChip(page.document, 'per'));
   assert.equal(page.localStorage.getItem('hiddenColumns'), '["per"]');
+});
+
+test('stockLink=yazi はローカル環境で /open-yazi に解決する', async function (t) {
+  const columns = createColumns();
+  columns[1] = { ...columns[1], stockLink: 'yazi' };
+  const page = await setupTable({ columns });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'name');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), '/open-yazi/7203');
+  assert.ok(anchor.hasAttribute('data-yazi'));
+  assert.equal(anchor.textContent.trim(), 'Toyota');
+});
+
+test('stockLink=yazi は静的環境では非リンクにする', async function (t) {
+  const columns = createColumns();
+  columns[1] = { ...columns[1], stockLink: 'yazi' };
+  const page = await setupTable({ columns, githubPages: true });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.equal(getFirstCellAnchor(page.document, 'name'), null);
+  assert.equal(getFirstCellText(page.document, 'name'), 'Toyota');
+});
+
+test('stockLink=shikiho はローカル環境で browser 経由リンクにする', async function (t) {
+  const rows = [{ code: '7203', name: 'Toyota', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'shikiho',
+    },
+  ];
+  const page = await setupTable({ rows, columns });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'price');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://shikiho.toyokeizai.net/stocks/7203/shikiho');
+  assert.equal(anchor.getAttribute('data-browser'), 'shikiho');
+});
+
+test('stockLink=shikiho は静的環境で direct リンクにする', async function (t) {
+  const rows = [{ code: '7203', name: 'Toyota', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'shikiho',
+    },
+  ];
+  const page = await setupTable({ rows, columns, githubPages: true });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'price');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://shikiho.toyokeizai.net/stocks/7203/shikiho');
+  assert.equal(anchor.hasAttribute('data-browser'), false);
+  assert.equal(anchor.hasAttribute('data-yazi'), false);
 });
