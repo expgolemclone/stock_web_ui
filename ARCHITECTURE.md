@@ -6,6 +6,8 @@ stock 関連 Web UI の共通パッケージ。`formula_screening` と `invest_l
 
 ```text
 stock_web_ui/
+├── .github/workflows/
+│   └── deploy-pages.yml    # docs/ を GitHub Pages へ公開
 ├── src/stock_web_ui/
 │   ├── __init__.py          # ASSETS_DIR / CONFIG_DIR / INDEX_TEMPLATE_PATH 公開
 │   ├── browser.py           # 許可URL付きブラウザ起動
@@ -35,7 +37,8 @@ stock_web_ui/
 - wheel ビルド時は `config/`, `docs/assets/`, `docs/index.template.html` を package data として `stock_web_ui/` 配下へ同梱する。
 - 実行時のパス解決は `stock_web_ui.__init__` が担当し、install 済み環境では package data を、editable / source tree ではリポジトリ直下の `config/` と `docs/` を参照する。
 - `docs/assets/stock-table.js` は配布物の一部として Git 管理する。これにより wheel 生成時に「事前に別プロジェクトで tsc を回しておく」前提をなくす。
-- `docs/assets/` は `stock_web_ui` 自身の GitHub Pages からも配信され、利用側の静的サイトが共有 runtime / style の正規 URL として直接参照できる。
+- `docs/assets/` は `deploy-pages.yml` により `stock_web_ui` 自身の GitHub Pages からも配信され、利用側の静的サイトが共有 runtime / style の正規 URL として直接参照できる。
+- GitHub repository settings の Pages source は `GitHub Actions` を前提とする。公開 URL は `https://expgolemclone.github.io/stock_web_ui/assets/`。
 
 ## 利用側との境界
 

@@ -20,6 +20,8 @@
 !package-lock.json
 !tests/
 !tests/**
+!.github/
+!.github/**
 
 # バイナリ・キャッシュは常に除外
 __pycache__/
