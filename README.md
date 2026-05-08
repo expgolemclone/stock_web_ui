@@ -5,6 +5,8 @@
 
 詳細な設計方針は [ARCHITECTURE.md](ARCHITECTURE.md) を参照してください。
 
+公開ページは [GitHub Pages](https://expgolemclone.github.io/stock_web_ui/) から確認できます。
+
 ## 提供するもの
 
 - `stock_web_ui.serve`: ローカル静的配信、`/api/*` ルーティング、ブラウザ起動、`/open` と `/open-yazi/{code}` の補助エンドポイント
@@ -122,11 +124,10 @@ StockTable.init({
 
 `docs/` は GitHub Pages の公開対象です。`main` への push で `.github/workflows/deploy-pages.yml` が `docs/` をアップロードします。
 
-共有 assets の公開 URL:
+ページと共有 assets は次の URL から確認できます。
 
-```text
-https://expgolemclone.github.io/stock_web_ui/assets/
-```
+- 公開ページ: [https://expgolemclone.github.io/stock_web_ui/](https://expgolemclone.github.io/stock_web_ui/)
+- 共有 assets: [https://expgolemclone.github.io/stock_web_ui/assets/](https://expgolemclone.github.io/stock_web_ui/assets/)
 
 ## 開発メモ
 
