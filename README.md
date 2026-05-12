@@ -13,6 +13,7 @@
 - `stock_web_ui.page`: 共通テンプレートから `index.html` を生成する `IndexPage` / `render_index_html`
 - `python -m stock_web_ui.render_index`: 利用側プロジェクトの `docs/index.html` を生成する CLI
 - `docs/assets/stock-table.js`: `StockTable.init(config)` で起動する ESM テーブルランタイム
+- `docs/assets/columns.js`: `StockColumns` として公開する共有カラム定義
 - `docs/assets/style.css`: 共有テーブル UI のスタイル
 - `config/*.toml`: サーバー既定値と外部ブラウザ連携設定
 
@@ -34,7 +35,7 @@ npm run test:ui
 uv run pytest
 ```
 
-`build:assets` は `src_ts/stock-table.ts` から `docs/assets/stock-table.js` と `docs/assets/stock-table.d.ts` を生成します。生成物は wheel と GitHub Pages 配信の両方で使うため、TypeScript を変更したら一緒に更新してください。
+`build:assets` は `src_ts/` から `docs/assets/stock-table.js`、`docs/assets/columns.js` と各 `.d.ts` を生成します。生成物は wheel と GitHub Pages 配信の両方で使うため、TypeScript を変更したら一緒に更新してください。
 
 ## 利用側での index.html 生成
 
@@ -57,7 +58,7 @@ uv run python -m stock_web_ui.render_index `
   --output "docs/index.html"
 ```
 
-生成されるページは、利用側の `docs/assets/app.js` をアプリ固有スクリプトとして読み込みます。
+生成されるページは、共有 `stock-table.js` / `columns.js` の後に利用側の `docs/assets/app.js` をアプリ固有スクリプトとして読み込みます。
 
 ## ローカルサーバーの利用例
 
@@ -132,6 +133,6 @@ StockTable.init({
 ## 開発メモ
 
 - 利用側プロジェクト固有の処理は利用側の `docs/assets/app.js` とデータ生成に置き、テーブル描画や共通リンク挙動はこのパッケージへ寄せます。
-- `docs/assets/stock-table.js` と `docs/assets/stock-table.d.ts` は生成物ですが、配布と静的配信に必要なため Git 管理します。
+- `docs/assets/stock-table.js`、`docs/assets/columns.js` と各 `.d.ts` は生成物ですが、配布と静的配信に必要なため Git 管理します。
 - `/open` は `config/magic_numbers.toml` の URL prefix allowlist を通った URL だけを外部ブラウザで開きます。
 - `/open-yazi/{code}` は `serve(..., yazi_base_dir=...)` を渡した場合だけ有効です。

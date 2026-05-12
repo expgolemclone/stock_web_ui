@@ -5,6 +5,8 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
+import pytest
+
 import stock_web_ui.handler as handler_mod
 
 
@@ -52,7 +54,12 @@ def test_resolve_asset_path_falls_back_to_package_root_when_symlink_escapes(tmp_
 
     package_file = package_assets / "stock-table.js"
     package_file.write_text("console.log('ok');\n", encoding="utf-8")
-    (project_assets / "stock-table.js").symlink_to(package_file)
+    try:
+        (project_assets / "stock-table.js").symlink_to(package_file)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("symlink creation requires elevated privileges on this Windows environment")
+        raise
 
     resolved = handler_mod._resolve_asset_path("stock-table.js", [project_assets, package_assets])
 
