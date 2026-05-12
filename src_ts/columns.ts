@@ -73,8 +73,8 @@ const PEG_5Y_2F_SPEC: MetricColSpec = {
 
 const FCF_YIELD_SPEC: MetricColSpec = {
   key: "fcf_yield_avg",
-  header: "fcf_y%",
-  title: "過去N期の平均FCF / 時価総額",
+  header: "fcf_10y%",
+  title: "過去10期の平均FCF / 時価総額",
   decimals: 2,
   scale: PERCENT_SCALE,
   suffix: "%",
