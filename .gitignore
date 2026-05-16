@@ -20,6 +20,12 @@
 !package-lock.json
 !tests/
 !tests/**
+!scripts/
+!scripts/**
+!.githooks/
+!.githooks/**
+!.claude/
+!.claude/**
 !.github/
 !.github/**
 

@@ -1,11 +1,13 @@
 {
   "scripts": {
     "build:assets": "tsc",
+    "check:downstream-ui": "node scripts/check_downstream_ui.mjs",
     "test:ui": "node --no-warnings --test tests/*.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",
+    "playwright": "^1.60.0",
     "typescript": "^6.0.3"
   }
 }

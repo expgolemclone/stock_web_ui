@@ -6,8 +6,15 @@ stock 関連 Web UI の共通パッケージ。`formula_screening`、`invest_lik
 
 ```text
 stock_web_ui/
+├── .githooks/
+│   └── pre-push             # 下流 repo の実画面確認
+├── .claude/hooks/
+│   └── stop_check_downstream_ui.py
 ├── .github/workflows/
 │   └── deploy-pages.yml    # docs/ を GitHub Pages へ公開
+├── scripts/
+│   ├── check_downstream_ui.mjs
+│   └── downstream_server.py
 ├── src/stock_web_ui/
 │   ├── __init__.py          # ASSETS_DIR / CONFIG_DIR / INDEX_TEMPLATE_PATH 公開
 │   ├── browser.py           # 許可URL付きブラウザ起動
@@ -72,6 +79,13 @@ stock_web_ui/
 - `/open` は `BrowserConfig` の allowlist を通した URL だけを外部ブラウザで開く。
 - `/open-yazi/{code}` は四季報 PDF 連携用のオプション機能で、`serve()` の `yazi_base_dir` 明示指定、`STOCK_WEB_UI_YAZI_BASE_DIR`、または `config/cli_defaults.toml` の `[yazi].base_dir` で有効になる。優先順位は明示指定、環境変数、TOML の順。
 
+## 開発フック
+
+- `npm run check:downstream-ui` は `formula_screening`、`invest_like_legends`、`land_value_research` を sibling repo として起動し、Playwright で実画面を確認する。
+- 検証は fixture ではなく、各 repo のローカル HTTP サーバーと実 SQLite DB (`stock_db/var/db/stocks.db`、`japan_company_handbook/data/stock_performance.db`、`land_value_research/data/land.db`) を使う。
+- `.githooks/pre-push` は Codex と Claude Code のどちらでも効く共通の強制点で、同じ検証コマンドを呼ぶ。ローカル workspace では `git config core.hooksPath .githooks` で有効化する。
+- `.claude/hooks/stop_check_downstream_ui.py` は Claude Code の Stop hook から同じ検証コマンドを呼ぶ薄い wrapper であり、判定ロジックは `scripts/check_downstream_ui.mjs` に集約する。
+
 ## テスト
 
 - `tests/test_serve.py`: ポート解放と起動ブラウザ
@@ -80,3 +94,4 @@ stock_web_ui/
 - `tests/test_handler.py`: JSON 応答 helper と静的資産解決
 - `tests/test_page.py`: 共通 index テンプレート描画
 - `tests/stock-table.test.mjs`: `jsdom` 上で共有ランタイムの列表示切替、hidden state 正規化、ソート復帰を検証
+- `scripts/check_downstream_ui.mjs`: 下流 3 repo の実 DB-backed 画面表示を Playwright で検証
