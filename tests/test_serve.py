@@ -15,9 +15,61 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import stock_web_ui.serve as serve_mod
+from stock_web_ui.config import BrowserConfig, ServerConfig, YaziConfig
+from stock_web_ui.page import IndexPage
 
 
 pytestmark = pytest.mark.skipif(not Path("/proc").exists(), reason="/proc is required")
+
+
+class _StopServer(Exception):
+    pass
+
+
+class _FakeHTTPServer:
+    def __init__(self, address: tuple[str, int], handler_cls: object) -> None:
+        self.address = address
+        self.handler_cls = handler_cls
+
+    def serve_forever(self) -> None:
+        raise _StopServer
+
+
+def test_serve_uses_configured_yazi_base_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    configured_base_dir: Path = tmp_path / "configured-handbook"
+    _install_fake_server(monkeypatch)
+    monkeypatch.setattr(serve_mod, "load_yazi_config", lambda: YaziConfig(base_dir=configured_base_dir))
+
+    with pytest.raises(_StopServer):
+        serve_mod.serve(
+            static_root=tmp_path,
+            index_page=IndexPage(title="Test"),
+            browser_config=BrowserConfig(entries={}),
+            server_config=ServerConfig(host="127.0.0.1", port=0),
+        )
+
+    assert serve_mod.RequestHandler.route_config.yazi_base_dir == configured_base_dir
+
+
+def test_serve_yazi_argument_overrides_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    explicit_base_dir: Path = tmp_path / "explicit-handbook"
+    _install_fake_server(monkeypatch)
+
+    def fail_load_yazi_config() -> YaziConfig:
+        raise AssertionError("load_yazi_config should not be called when yazi_base_dir is explicit")
+
+    monkeypatch.setattr(serve_mod, "load_yazi_config", fail_load_yazi_config)
+
+    with pytest.raises(_StopServer):
+        serve_mod.serve(
+            static_root=tmp_path,
+            index_page=IndexPage(title="Test"),
+            browser_config=BrowserConfig(entries={}),
+            server_config=ServerConfig(host="127.0.0.1", port=0),
+            yazi_base_dir=explicit_base_dir,
+        )
+
+    assert serve_mod.RequestHandler.route_config.yazi_base_dir == explicit_base_dir
 
 
 def test_find_listening_pids_detects_listener() -> None:
@@ -122,6 +174,12 @@ def test_open_startup_browser_skips_missing_xdg_open(
     captured = capsys.readouterr()
     assert "xdg-open" in captured.out
     assert "http://127.0.0.1:8080" in captured.out
+
+
+def _install_fake_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(serve_mod, "HTTPServer", _FakeHTTPServer)
+    monkeypatch.setattr(serve_mod, "_release_port_if_needed", lambda host, port: None)
+    monkeypatch.setattr(serve_mod, "_open_startup_browser", lambda url: None)
 
 
 def _reserve_free_port() -> int:

@@ -1,3 +1,6 @@
 [server]
 host = "127.0.0.1"
 port = 8080
+
+[yazi]
+base_dir = "/home/exp/projects/japan_company_handbook/data"

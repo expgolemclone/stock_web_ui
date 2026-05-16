@@ -70,7 +70,7 @@ stock_web_ui/
 - `IndexPage.shared_asset_base_url` を省略するとローカル相対の `assets/*` を使い、指定すると共有 runtime / style の script/link をその URL へ向ける。
 - `handler.py` は公開ヘルパーとして `send_json_response()` と `json_route()` を提供する。利用側は `BaseHTTPRequestHandler` のヘッダ送信を手書きしなくてよい。
 - `/open` は `BrowserConfig` の allowlist を通した URL だけを外部ブラウザで開く。
-- `/open-yazi/{code}` は四季報 PDF 連携用のオプション機能で、利用側が `yazi_base_dir` を渡したときだけ有効になる。
+- `/open-yazi/{code}` は四季報 PDF 連携用のオプション機能で、`serve()` の `yazi_base_dir` 明示指定、`STOCK_WEB_UI_YAZI_BASE_DIR`、または `config/cli_defaults.toml` の `[yazi].base_dir` で有効になる。優先順位は明示指定、環境変数、TOML の順。
 
 ## テスト
 

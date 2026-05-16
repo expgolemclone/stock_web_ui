@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass
-from typing import TypedDict
+from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from stock_web_ui import CONFIG_DIR
+
+_YAZI_BASE_DIR_ENV: str = "STOCK_WEB_UI_YAZI_BASE_DIR"
 
 
 class _ServerSection(TypedDict):
@@ -14,8 +18,13 @@ class _ServerSection(TypedDict):
     port: int
 
 
+class _YaziSection(TypedDict, total=False):
+    base_dir: str
+
+
 class _CliDefaultsToml(TypedDict):
     server: _ServerSection
+    yazi: NotRequired[_YaziSection]
 
 
 class _BrowsersSection(TypedDict):
@@ -62,6 +71,14 @@ class BrowserConfig:
         return f"BrowserConfig(keys={list(self.entries.keys())})"
 
 
+@dataclass(frozen=True, slots=True)
+class YaziConfig:
+    base_dir: Path | None
+
+    def __repr__(self) -> str:
+        return f"YaziConfig(base_dir={self.base_dir!r})"
+
+
 def load_server_config() -> ServerConfig:
     raw: _CliDefaultsToml = _load_toml("cli_defaults.toml")
     section: _ServerSection = raw["server"]
@@ -77,6 +94,25 @@ def load_browser_config() -> BrowserConfig:
         for key, cmd in browsers.items()
     }
     return BrowserConfig(entries=entries)
+
+
+def load_yazi_config() -> YaziConfig:
+    raw_env_value: str | None = os.environ.get(_YAZI_BASE_DIR_ENV)
+    if raw_env_value is not None:
+        return YaziConfig(base_dir=_optional_path(raw_env_value))
+
+    raw: _CliDefaultsToml = _load_toml("cli_defaults.toml")
+    yazi_section: _YaziSection = raw.get("yazi", {})
+    return YaziConfig(base_dir=_optional_path(yazi_section.get("base_dir")))
+
+
+def _optional_path(raw_value: str | None) -> Path | None:
+    if raw_value is None:
+        return None
+    value: str = raw_value.strip()
+    if not value:
+        return None
+    return Path(value).expanduser()
 
 
 def _load_toml[T](filename: str) -> T:

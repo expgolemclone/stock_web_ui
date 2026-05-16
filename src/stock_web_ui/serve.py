@@ -11,7 +11,7 @@ from http.server import HTTPServer
 from pathlib import Path
 
 from stock_web_ui import ASSETS_DIR
-from stock_web_ui.config import BrowserConfig, ServerConfig, load_server_config
+from stock_web_ui.config import BrowserConfig, ServerConfig, load_server_config, load_yazi_config
 from stock_web_ui.handler import RequestHandler, RouteConfig
 from stock_web_ui.page import IndexPage, render_index_html
 
@@ -42,7 +42,7 @@ def serve(
         browser_config: Browser config (loads default if omitted).
         server_config: Server host/port (loads default if omitted).
         api_routes: Dict mapping "/api/..." paths to handler callables.
-        yazi_base_dir: Base directory for yazi PDF integration (optional).
+        yazi_base_dir: Base directory for yazi PDF integration (overrides config).
     """
     if server_config is None:
         server_config = load_server_config()
@@ -53,13 +53,16 @@ def serve(
         raise ValueError("Either index_page or index_path must be provided")
 
     index_html: bytes = render_index_html(index_page) if index_page is not None else index_path.read_bytes()
+    resolved_yazi_base_dir: Path | None = (
+        yazi_base_dir if yazi_base_dir is not None else load_yazi_config().base_dir
+    )
 
     RequestHandler.route_config = RouteConfig(
         static_roots=_build_static_roots(static_root),
         index_html=index_html,
         browser_config=browser_config,
         api_routes=api_routes or {},
-        yazi_base_dir=yazi_base_dir,
+        yazi_base_dir=resolved_yazi_base_dir,
     )
 
     _release_port_if_needed(server_config.host, server_config.port)
