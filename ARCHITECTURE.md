@@ -1,6 +1,6 @@
 # Architecture
 
-stock 関連 Web UI の共通パッケージ。`formula_screening` と `invest_like_legends` から参照される。Python 製 HTTP サーバー、共有 HTML テンプレート、ブラウザ向け TypeScript テーブル描画コードをまとめて提供する。
+stock 関連 Web UI の共通パッケージ。`formula_screening`、`invest_like_legends`、`land_value_research` から参照される。Python 製 HTTP サーバー、共有 HTML テンプレート、ブラウザ向け TypeScript テーブル描画コードをまとめて提供する。
 
 ## ディレクトリ構成
 
@@ -62,6 +62,7 @@ stock_web_ui/
 - 列の表示切替は `hiddenColumns` を `localStorage` に保存し、見出し (`th`)・本文セル (`td`)・トグル状態へ同じ規則で反映する。
 - `defaultSortKey` の列は表示切替対象に含めず、現在ソート中の列を非表示にした場合は既定ソートへ戻す。
 - ES Modules (`type="module"`) を使い、バンドラなしで動かす。
+- **Detail modal** (`StockTableConfig.detailModal`, デフォルト `false`): `ColumnDef.detailContent` を持つカラムでボタンを表示し、クリック時にモーダルで HTML コンテンツを展開する。`detailModal: true` を設定した consumer だけが有効になる。`land_value_research` が調査メモ表示に使用する。
 
 ## HTTP サーバー
 

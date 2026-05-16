@@ -30,6 +30,7 @@ export interface ColumnDef {
     browserKey?: string;
     isPosition?: boolean;
     toggleable?: boolean;
+    detailContent?: (row: Record<string, unknown>) => string | null;
 }
 export interface StockTableConfig {
     defaultTitle: string;
@@ -41,6 +42,7 @@ export interface StockTableConfig {
     tabMode?: boolean;
     defaultTabKey?: string;
     githubPages?: boolean;
+    detailModal?: boolean;
 }
 export declare const StockTable: {
     init: typeof init;

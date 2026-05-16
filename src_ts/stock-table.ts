@@ -39,6 +39,7 @@ export interface ColumnDef {
   browserKey?: string;
   isPosition?: boolean;
   toggleable?: boolean;
+  detailContent?: (row: Record<string, unknown>) => string | null;
 }
 
 export interface StockTableConfig {
@@ -51,6 +52,7 @@ export interface StockTableConfig {
   tabMode?: boolean;
   defaultTabKey?: string;
   githubPages?: boolean;
+  detailModal?: boolean;
 }
 
 interface StockRow {
@@ -118,6 +120,9 @@ const _el: Elements = {
   toggleBar: null,
 };
 
+let _detailIndex: number = 0;
+const _detailMap: Record<number, string> = {};
+
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
@@ -143,6 +148,10 @@ function init(config: StockTableConfig): void {
   _el.thead = document.querySelector("#stockTable > thead");
   _el.tbody = document.getElementById("tbody");
   _el.toggleBar = document.getElementById("toggleBar");
+
+  if (config.detailModal) {
+    _createModal();
+  }
 
   _renderToggleChips();
   _bindEvents();
@@ -326,6 +335,16 @@ function _renderBody(rows: StockRow[]): void {
 }
 
 function _renderCellContent(col: ColumnDef, row: StockRow, context: RenderContext): string {
+  if (col.detailContent && _config?.detailModal) {
+    const detail: string | null = col.detailContent(row);
+    if (detail) {
+      const idx: number = _detailIndex++;
+      _detailMap[idx] = detail;
+      return '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+    }
+    return col.render(row);
+  }
+
   const content: string = col.render(row);
   const resolvedLink: ResolvedLink | null = _resolveColumnLink(col, row, context);
   if (resolvedLink === null) {
@@ -705,6 +724,78 @@ function _bindEvents(): void {
     e.preventDefault();
     fetch((link as HTMLAnchorElement).href).catch(function (): void { /* ignore */ });
   });
+
+  /* detail modal */
+  document.addEventListener("click", function (e: MouseEvent): void {
+    const btn: Element | null = e.target instanceof Element ? e.target.closest(".detail-btn") : null;
+    if (!btn) {
+      return;
+    }
+    const idx: string | undefined = (btn as HTMLElement).dataset.detailIdx;
+    if (idx === undefined) {
+      return;
+    }
+    const content: string | undefined = _detailMap[Number(idx)];
+    if (content === undefined) {
+      return;
+    }
+    _openDetailModal(content);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Detail modal                                                       */
+/* ------------------------------------------------------------------ */
+
+function _createModal(): void {
+  const modal: HTMLDivElement = document.createElement("div");
+  modal.id = "detail-modal";
+  modal.className = "detail-modal hidden";
+  modal.innerHTML =
+    '<div class="detail-modal-backdrop"></div>' +
+    '<div class="detail-modal-content">' +
+    '<button class="detail-modal-close" type="button">&times;</button>' +
+    '<div class="detail-modal-body"></div>' +
+    "</div>";
+  document.body.appendChild(modal);
+
+  const backdrop: Element | null = modal.querySelector(".detail-modal-backdrop");
+  const closeBtn: Element | null = modal.querySelector(".detail-modal-close");
+  if (backdrop) {
+    backdrop.addEventListener("click", _closeDetailModal);
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener("click", _closeDetailModal);
+  }
+  document.addEventListener("keydown", function (e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      _closeDetailModal();
+    }
+  });
+}
+
+function _openDetailModal(html: string): void {
+  const modal: HTMLElement | null = document.getElementById("detail-modal");
+  if (!modal) {
+    return;
+  }
+  const body: Element | null = modal.querySelector(".detail-modal-body");
+  if (body) {
+    body.innerHTML = html;
+  }
+  modal.classList.remove("hidden");
+}
+
+function _closeDetailModal(): void {
+  const modal: HTMLElement | null = document.getElementById("detail-modal");
+  if (!modal) {
+    return;
+  }
+  modal.classList.add("hidden");
+  const body: Element | null = modal.querySelector(".detail-modal-body");
+  if (body) {
+    body.innerHTML = "";
+  }
 }
 
 /* ------------------------------------------------------------------ */

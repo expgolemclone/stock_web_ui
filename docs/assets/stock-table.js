@@ -32,6 +32,8 @@ const _el = {
     tbody: null,
     toggleBar: null,
 };
+let _detailIndex = 0;
+const _detailMap = {};
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
@@ -52,6 +54,9 @@ function init(config) {
     _el.thead = document.querySelector("#stockTable > thead");
     _el.tbody = document.getElementById("tbody");
     _el.toggleBar = document.getElementById("toggleBar");
+    if (config.detailModal) {
+        _createModal();
+    }
     _renderToggleChips();
     _bindEvents();
     _render();
@@ -211,6 +216,15 @@ function _renderBody(rows) {
     }).join("");
 }
 function _renderCellContent(col, row, context) {
+    if (col.detailContent && _config?.detailModal) {
+        const detail = col.detailContent(row);
+        if (detail) {
+            const idx = _detailIndex++;
+            _detailMap[idx] = detail;
+            return '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+        }
+        return col.render(row);
+    }
     const content = col.render(row);
     const resolvedLink = _resolveColumnLink(col, row, context);
     if (resolvedLink === null) {
@@ -554,6 +568,72 @@ function _bindEvents() {
         e.preventDefault();
         fetch(link.href).catch(function () { });
     });
+    /* detail modal */
+    document.addEventListener("click", function (e) {
+        const btn = e.target instanceof Element ? e.target.closest(".detail-btn") : null;
+        if (!btn) {
+            return;
+        }
+        const idx = btn.dataset.detailIdx;
+        if (idx === undefined) {
+            return;
+        }
+        const content = _detailMap[Number(idx)];
+        if (content === undefined) {
+            return;
+        }
+        _openDetailModal(content);
+    });
+}
+/* ------------------------------------------------------------------ */
+/*  Detail modal                                                       */
+/* ------------------------------------------------------------------ */
+function _createModal() {
+    const modal = document.createElement("div");
+    modal.id = "detail-modal";
+    modal.className = "detail-modal hidden";
+    modal.innerHTML =
+        '<div class="detail-modal-backdrop"></div>' +
+            '<div class="detail-modal-content">' +
+            '<button class="detail-modal-close" type="button">&times;</button>' +
+            '<div class="detail-modal-body"></div>' +
+            "</div>";
+    document.body.appendChild(modal);
+    const backdrop = modal.querySelector(".detail-modal-backdrop");
+    const closeBtn = modal.querySelector(".detail-modal-close");
+    if (backdrop) {
+        backdrop.addEventListener("click", _closeDetailModal);
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener("click", _closeDetailModal);
+    }
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+            _closeDetailModal();
+        }
+    });
+}
+function _openDetailModal(html) {
+    const modal = document.getElementById("detail-modal");
+    if (!modal) {
+        return;
+    }
+    const body = modal.querySelector(".detail-modal-body");
+    if (body) {
+        body.innerHTML = html;
+    }
+    modal.classList.remove("hidden");
+}
+function _closeDetailModal() {
+    const modal = document.getElementById("detail-modal");
+    if (!modal) {
+        return;
+    }
+    modal.classList.add("hidden");
+    const body = modal.querySelector(".detail-modal-body");
+    if (body) {
+        body.innerHTML = "";
+    }
 }
 /* ------------------------------------------------------------------ */
 /*  LocalStorage helpers                                               */

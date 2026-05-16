@@ -279,6 +279,142 @@ a.monex:hover {
   color: #6bb3ff;
 }
 
+/* Detail modal */
+
+.detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-modal.hidden {
+  display: none;
+}
+
+.detail-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.detail-modal-content {
+  position: relative;
+  width: 90vw;
+  max-width: 1100px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #444c6a;
+  border-radius: 12px;
+  padding: 32px 44px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+  font-size: 0.95em;
+  line-height: 1.7;
+}
+
+.detail-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.6em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.detail-modal-close:hover {
+  color: #e0e0e0;
+}
+
+.detail-modal-body h3 {
+  font-size: 1.2em;
+  color: #e0e0e0;
+  margin: 16px 0 8px;
+  border-bottom: 1px solid #2a2a4a;
+  padding-bottom: 4px;
+}
+
+.detail-modal-body h4 {
+  font-size: 1.05em;
+  color: #d0d0d0;
+  margin: 12px 0 6px;
+}
+
+.detail-modal-body h5 {
+  font-size: 1em;
+  color: #c0c0c0;
+  margin: 10px 0 4px;
+}
+
+.detail-modal-body ul {
+  margin: 6px 0 6px 20px;
+  padding: 0;
+}
+
+.detail-modal-body li {
+  margin: 3px 0;
+}
+
+.detail-modal-body p {
+  margin: 6px 0;
+}
+
+.detail-modal-body code {
+  background: #1a1a2e;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  color: #f0c674;
+}
+
+.detail-modal-body a {
+  color: #5dade2;
+}
+
+.detail-modal-body .md-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.9em;
+}
+
+.detail-modal-body .md-table th {
+  background: #16213e;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 2px solid #444c6a;
+  white-space: normal;
+}
+
+.detail-modal-body .md-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #2a2a4a;
+  white-space: normal;
+}
+
+.detail-btn {
+  background: #1a2744;
+  border: 1px solid #5dade2;
+  color: #5dade2;
+  padding: 3px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.detail-btn:hover {
+  background: #5dade2;
+  color: #0d1117;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
