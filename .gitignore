@@ -9,6 +9,11 @@
 !config/**
 !src/
 !src/**
+!rust/
+!rust/Cargo.lock
+!rust/Cargo.toml
+!rust/src/
+!rust/src/**
 !docs/
 !docs/**
 !README.md

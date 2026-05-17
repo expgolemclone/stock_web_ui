@@ -1,6 +1,8 @@
 # Architecture
 
-stock 関連 Web UI の共通パッケージ。`formula_screening`、`invest_like_legends`、`land_value_research` から参照される。Python 製 HTTP サーバー、共有 HTML テンプレート、ブラウザ向け TypeScript テーブル描画コードをまとめて提供する。
+stock 関連 Web UI の共通パッケージ。`formula_screening`、`invest_like_legends`、`land_value_research` から参照される。Python 製 HTTP サーバー、移行中の Rust HTTP server core、共有 HTML テンプレート、ブラウザ向け TypeScript テーブル描画コードをまとめて提供する。
+
+`rust/` には移行中の Rust サーバー実装を置く。既存の TypeScript runtime / asset はそのまま使い、index 描画、静的配信、JSON API、`/open`、`/open-yazi` を Rust から提供できる。
 
 ## ディレクトリ構成
 
@@ -23,8 +25,12 @@ stock_web_ui/
 │   ├── page.py              # 共通 index.html テンプレート描画
 │   ├── render_index.py      # テンプレートから index.html を生成する CLI
 │   └── serve.py             # サーバー起動, ポート解放, 起動ブラウザ
+├── rust/
+│   ├── Cargo.toml
+│   └── src/lib.rs            # Rust サーバー実装
 ├── src_ts/
-│   └── stock-table.ts       # 共通テーブル描画ライブラリ
+│   ├── stock-table.ts       # 共通テーブル描画ライブラリ
+│   └── columns.ts           # 共通カラム定義
 ├── docs/
 │   ├── index.html           # 共有静的サンプル
 │   ├── index.template.html  # 共通テンプレート
@@ -73,17 +79,18 @@ stock_web_ui/
 
 ## HTTP サーバー
 
-- `serve()` は `IndexPage` を受け取り、共通テンプレートから `index.html` をレンダリングして返す。必要なら `index_path` も使える。
+- Python の `stock_web_ui.serve.serve()` は `IndexPage` を受け取り、共通テンプレートから `index.html` をレンダリングして返す。必要なら `index_path` も使える。
 - `IndexPage.shared_asset_base_url` を省略するとローカル相対の `assets/*` を使い、指定すると共有 runtime / style の script/link をその URL へ向ける。
 - `handler.py` は公開ヘルパーとして `send_json_response()` と `json_route()` を提供する。利用側は `BaseHTTPRequestHandler` のヘッダ送信を手書きしなくてよい。
 - `/open` は `BrowserConfig` の allowlist を通した URL だけを外部ブラウザで開く。
 - `/open-yazi/{code}` は四季報 PDF 連携用のオプション機能で、`serve()` の `yazi_base_dir` 明示指定、`STOCK_WEB_UI_YAZI_BASE_DIR`、または `config/cli_defaults.toml` の `[yazi].base_dir` で有効になる。優先順位は明示指定、環境変数、TOML の順。
+- Rust の `stock_web_ui_core::serve()` は `ServeConfig` を受け取り、`/`、1つの JSON API path、`/assets/*`、`/open`、`/open-yazi/{code}` を配信する。起動前に既存リスナーを解放し、起動後に既定ブラウザを開く。呼び出し側は `ServerConfig`、browser allowlist、template path、shared assets root を明示的に渡す。
 
 ## 開発フック
 
 - `npm run check:downstream-ui` は `formula_screening`、`invest_like_legends`、`land_value_research` を sibling repo として起動し、Playwright で実画面を確認する。
 - 検証は fixture ではなく、各 repo のローカル HTTP サーバーと実 SQLite DB (`stock_db/var/db/stocks.db`、`japan_company_handbook/data/stock_performance.db`、`land_value_research/data/land.db`) を使う。
-- `.githooks/pre-push` は Codex と Claude Code のどちらでも効く共通の強制点で、同じ検証コマンドを呼ぶ。ローカル workspace では `git config core.hooksPath .githooks` で有効化する。
+- `.githooks/pre-push` は Codex と Claude Code のどちらでも効く共通の強制点で、同じ検証コマンドを呼ぶ。通常の Git checkout では `git config core.hooksPath .githooks` で有効化する。`.git` を持たない jj workspace ではこの Git hook 設定は適用できない。
 - `.claude/hooks/stop_check_downstream_ui.py` は Claude Code の Stop hook から同じ検証コマンドを呼ぶ薄い wrapper であり、判定ロジックは `scripts/check_downstream_ui.mjs` に集約する。
 
 ## テスト
