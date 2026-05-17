@@ -9,7 +9,8 @@ import { spawn, spawnSync } from 'node:child_process';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname);
 const PARENT = resolve(ROOT, '..');
-const STATE_FILE = join(ROOT, '.git', 'downstream-ui-check-state.json');
+const STATE_DIR = existsSync(join(ROOT, '.jj')) ? join(ROOT, '.jj') : join(ROOT, '.git');
+const STATE_FILE = join(STATE_DIR, 'downstream-ui-check-state.json');
 const FORCE = process.argv.includes('--force');
 
 const DATA_FILES = [
