@@ -43,10 +43,11 @@ function createColumns({ defaultColumnToggleable = false } = {}) {
   ];
 }
 
-function createConfig(columns, { githubPages = false } = {}) {
+function createConfig(columns, { githubPages = false, metadataUrl = undefined } = {}) {
   return {
     defaultTitle: '銘柄一覧',
     dataUrl: '/api/stocks',
+    metadataUrl,
     columns,
     metricThresholds: {},
     defaultSortKey: 'code',
@@ -82,6 +83,7 @@ async function flushAsync() {
 
 async function setupTable({
   rows = BASE_ROWS,
+  metadata = null,
   storedHiddenColumns = null,
   columns = createColumns(),
   githubPages = false,
@@ -143,6 +145,14 @@ async function setupTable({
         },
       };
     }
+    if (String(url) === '/api/stock-price-meta') {
+      return {
+        ok: metadata !== false,
+        async json() {
+          return metadata ?? {};
+        },
+      };
+    }
     return {
       ok: true,
       async json() {
@@ -156,7 +166,10 @@ async function setupTable({
   }
 
   const { StockTable } = await loadStockTableModule();
-  StockTable.init(createConfig(columns, { githubPages }));
+  StockTable.init(createConfig(columns, {
+    githubPages,
+    metadataUrl: metadata === null ? undefined : '/api/stock-price-meta',
+  }));
   await flushAsync();
 
   return {
@@ -220,6 +233,24 @@ test('初期表示で非表示列が見出しと本文の両方に反映され�
     return cell.classList.contains('hidden-col');
   }));
   assert.ok(!getToggleChip(page.document, 'per').classList.contains('active'));
+});
+
+test('metadataUrl の価格基準日をステータス欄に表示する', async function (t) {
+  const page = await setupTable({ metadata: { price_date: '2026-05-15' } });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.equal(page.document.getElementById('statusMessage').textContent.trim(), '2 件 / 株価基準日: 2026-05-15');
+});
+
+test('metadataUrl の取得に失敗しても件数表示を維持する', async function (t) {
+  const page = await setupTable({ metadata: false });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.equal(page.document.getElementById('statusMessage').textContent.trim(), '2 件');
 });
 
 test('ソート中の列を非表示にすると既定ソートへ戻る', async function (t) {

@@ -45,6 +45,7 @@ export interface ColumnDef {
 export interface StockTableConfig {
   defaultTitle: string;
   dataUrl: string;
+  metadataUrl?: string;
   columns: ColumnDef[];
   metricThresholds: Record<string, MetricThreshold>;
   defaultSortKey: string;
@@ -65,6 +66,7 @@ interface StockRow {
 
 interface State {
   rows: StockRow[] | null;
+  priceDate: string | null;
   currentTab: string;
   sortKey: string;
   sortDir: SortDirection;
@@ -104,6 +106,7 @@ let _config: StockTableConfig | null = null;
 
 const _state: State = {
   rows: null,
+  priceDate: null,
   currentTab: "",
   sortKey: "",
   sortDir: "asc",
@@ -138,8 +141,13 @@ _globalScope.StockTable = StockTable;
 
 function init(config: StockTableConfig): void {
   _config = config;
+  _state.rows = null;
+  _state.priceDate = null;
   _state.sortKey = config.defaultSortKey;
   _state.sortDir = config.defaultSortDirection;
+  _state.currentTab = "";
+  _state.loading = true;
+  _state.error = "";
   _state.hiddenCols = _sanitizeHiddenCols(_loadHiddenCols());
   _saveHiddenCols(_state.hiddenCols);
 
@@ -157,6 +165,7 @@ function init(config: StockTableConfig): void {
   _bindEvents();
   _render();
   void _loadData();
+  void _loadMetadata();
 }
 
 /* ------------------------------------------------------------------ */
@@ -188,6 +197,26 @@ async function _loadData(): Promise<void> {
     _state.loading = false;
     _state.error = "データを読み込めませんでした。";
     _render();
+  }
+}
+
+async function _loadMetadata(): Promise<void> {
+  if (!_config?.metadataUrl) {
+    return;
+  }
+
+  try {
+    const response: Response = await fetch(_config.metadataUrl, { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const raw: unknown = await response.json();
+    _state.priceDate = _normalizePriceDate(raw);
+    if (!_state.loading && !_state.error) {
+      _render();
+    }
+  } catch (_err) {
+    _state.priceDate = null;
   }
 }
 
@@ -225,6 +254,17 @@ function _normalizeRows(raw: unknown): StockRow[] {
   }
 
   return [];
+}
+
+function _normalizePriceDate(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const value: unknown = (raw as Record<string, unknown>).price_date;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  return value;
 }
 
 function _resolveDefaultTab(rows: StockRow[]): string {
@@ -272,7 +312,7 @@ function _render(): void {
   const visible: StockRow[] = _getVisibleRows();
   const tabName: string = _getActiveTabName();
   document.title = tabName ? tabName + " - " + _config!.defaultTitle : _config!.defaultTitle;
-  _el.status!.textContent = visible.length.toLocaleString("ja-JP") + " 件";
+  _el.status!.textContent = _formatStatus(visible.length);
 
   if (visible.length === 0) {
     _renderMessageRow("該当する銘柄はありません。");
@@ -280,6 +320,14 @@ function _render(): void {
   }
 
   _renderBody(visible);
+}
+
+function _formatStatus(visibleCount: number): string {
+  let message: string = visibleCount.toLocaleString("ja-JP") + " 件";
+  if (_state.priceDate) {
+    message += " / 株価基準日: " + _state.priceDate;
+  }
+  return message;
 }
 
 function _renderHead(): void {

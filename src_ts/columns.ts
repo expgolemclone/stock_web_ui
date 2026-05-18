@@ -18,8 +18,10 @@ export interface MetricColSpec {
 
 type Row = Record<string, unknown>;
 type MetricAccessor = (row: Row) => number | null;
+type StatusAccessor = (row: Row) => string | null;
 
 const PERCENT_SCALE = 100;
+const NON_POSITIVE_GROWTH_STATUS = "non_positive_growth";
 
 export const NCR_SPEC: MetricColSpec = {
   key: "net_cash_ratio",
@@ -104,6 +106,28 @@ export function buildMetricCol(spec: MetricColSpec, accessor: MetricAccessor): C
   };
 }
 
+function buildPegCol(
+  spec: MetricColSpec,
+  accessor: MetricAccessor,
+  statusAccessor: StatusAccessor,
+): ColumnDef {
+  return {
+    key: spec.key,
+    header: spec.header,
+    type: "num",
+    title: spec.title,
+    toggleable: true,
+    render: (row: Row): string => {
+      const value = scaleValue(accessor(row), spec);
+      if (value !== null) {
+        return value.toFixed(spec.decimals) + (spec.suffix ?? "");
+      }
+      return statusAccessor(row) === NON_POSITIVE_GROWTH_STATUS ? "neg" : "-";
+    },
+    sortValue: (row: Row): number | null => scaleValue(accessor(row), spec),
+  };
+}
+
 export const codeCol: ColumnDef = {
   key: "code",
   header: "code",
@@ -138,14 +162,16 @@ export const priceCol: ColumnDef = {
   sortValue: (row: Row): number | null => toNumber(row.price),
 };
 
-export const peg5yCol: ColumnDef = buildMetricCol(
+export const peg5yCol: ColumnDef = buildPegCol(
   PEG_5Y_SPEC,
   (row: Row): number | null => toNumber(row.peg_trailing_5),
+  (row: Row): string | null => toStatus(row.peg_trailing_5_status),
 );
 
-export const peg5y2fCol: ColumnDef = buildMetricCol(
+export const peg5y2fCol: ColumnDef = buildPegCol(
   PEG_5Y_2F_SPEC,
   (row: Row): number | null => toNumber(row.peg_blended_5y_actual_2f),
+  (row: Row): string | null => toStatus(row.peg_blended_5y_actual_2f_status),
 );
 
 export const fcfYCol: ColumnDef = buildMetricCol(
@@ -197,4 +223,8 @@ function scaleValue(value: number | null, spec: MetricColSpec): number | null {
 
 function toNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function toStatus(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }

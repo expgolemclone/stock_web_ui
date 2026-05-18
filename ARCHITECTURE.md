@@ -64,9 +64,10 @@ stock_web_ui/
 
 ## フロントエンド
 
-- `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。
+- `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。任意の `metadataUrl` から `{ "price_date": "YYYY-MM-DD" }` を取得できる場合は、ステータス欄に株価基準日を追加表示する。
+- `StockTableConfig.metadataUrl` を指定した場合、runtime は `{ "price_date": "YYYY-MM-DD" }` を取得し、ステータス欄に `株価基準日: YYYY-MM-DD` を件数と並べて表示する。取得失敗時は行データ表示を優先し、基準日は表示しない。
 - `stock-table.js` は ESM として配信される一方で `globalThis.StockTable` にも公開され、利用側 `app.js` はこの共有 API を前提に起動する。
-- `columns.js` は ESM として配信される一方で `globalThis.StockColumns` にも公開され、共通の `code` / `name` / `price` / 指標列と閾値を提供する。
+- `columns.js` は ESM として配信される一方で `globalThis.StockColumns` にも公開され、共通の `code` / `name` / `price` / 指標列と閾値を提供する。PEG 列は `*_status === "non_positive_growth"` のとき `neg`、その他の未算出値は `-` と表示する。
 - 共通リンクは `ColumnDef.stockLink` (`monex` / `shikiho` / `yazi`) で指定できる。runtime が `row.code` と `RenderContext.githubPages` から `href` / `linkMode` / `browserKey` を解決する。
 - `code` / `name` / `price` の canonical mapping は `monex` / `yazi` / `shikiho` とする。
 - `yazi` の canonical behavior は「ローカルでは `/open-yazi/{code}`、静的配信では非リンク」であり、consumer は特別な理由がない限り `stockLink: "yazi"` をそのまま使う。
@@ -100,5 +101,5 @@ stock_web_ui/
 - `tests/test_config.py`: package data からの設定読込
 - `tests/test_handler.py`: JSON 応答 helper と静的資産解決
 - `tests/test_page.py`: 共通 index テンプレート描画
-- `tests/stock-table.test.mjs`: `jsdom` 上で共有ランタイムの列表示切替、hidden state 正規化、ソート復帰を検証
+- `tests/stock-table.test.mjs`: `jsdom` 上で共有ランタイムの列表示切替、hidden state 正規化、ソート復帰、価格基準日表示を検証
 - `scripts/check_downstream_ui.mjs`: 下流 3 repo の実 DB-backed 画面表示を Playwright で検証

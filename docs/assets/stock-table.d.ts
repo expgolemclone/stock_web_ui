@@ -35,6 +35,7 @@ export interface ColumnDef {
 export interface StockTableConfig {
     defaultTitle: string;
     dataUrl: string;
+    metadataUrl?: string;
     columns: ColumnDef[];
     metricThresholds: Record<string, MetricThreshold>;
     defaultSortKey: string;

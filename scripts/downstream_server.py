@@ -50,7 +50,7 @@ def _serve_formula_screening(project_dir: Path, port: int) -> None:
     from stock_db.paths import STOCKS_DB_PATH
     from stock_db.storage.connection import get_connection
 
-    strategy_path = project_dir / "strategies" / "net_cash_fcf.py"
+    strategy_path = project_dir / "strategies" / "net_cash_fcf.toml"
     tickers = _sample_tickers(STOCKS_DB_PATH)
     with get_connection(STOCKS_DB_PATH) as conn:
         stocks = run_screening(conn, strategy_path, workers=1, tickers=tickers, return_all=True)
@@ -80,7 +80,43 @@ def _sample_tickers(db_path: Path, limit: int = 20) -> list[str]:
 
 def _serve_invest_like_legends(port: int) -> None:
     import serve as app_serve
+    from investor_data import (
+        build_investors_document,
+        build_shareholder_candidates_document,
+        build_stock_price_metadata,
+        compute_metrics_map,
+        load_major_shareholder_rows,
+        load_stock_names,
+        resolve_stocks_db_path,
+    )
     from stock_web_ui.page import IndexPage
+
+    db_path = resolve_stocks_db_path()
+    stock_names = load_stock_names(db_path)
+    metrics_map = compute_metrics_map(db_path)
+    shareholder_rows = load_major_shareholder_rows()
+    investors_doc = build_investors_document(
+        stock_names=stock_names,
+        metrics_map=metrics_map,
+        shareholder_rows=shareholder_rows,
+    )
+    candidates_doc = build_shareholder_candidates_document(
+        stock_names=stock_names,
+        metrics_map=metrics_map,
+        shareholder_rows=shareholder_rows,
+    )
+    candidate_summaries = [
+        {
+            "id": candidate["id"],
+            "name": candidate["name"],
+            "aliases": candidate["aliases"],
+            "holding_count": candidate["holding_count"],
+            "priced_holding_count": candidate["priced_holding_count"],
+            "total_amount_millions": candidate["total_amount_millions"],
+        }
+        for candidate in candidates_doc
+    ]
+    candidate_details = {candidate["id"]: candidate for candidate in candidates_doc}
 
     app_serve._serve(
         static_root=app_serve._STATIC_ROOT,
@@ -90,7 +126,12 @@ def _serve_invest_like_legends(port: int) -> None:
             tab_aria_label="投資家切替",
         ),
         server_config=_server_config(port),
-        api_routes=app_serve._create_api_routes(),
+        api_routes=app_serve._create_api_routes(
+            investors_doc,
+            candidate_summaries,
+            candidate_details,
+            build_stock_price_metadata(db_path),
+        ),
         yazi_base_dir=app_serve._HANDBOOK_DATA_DIR,
     )
 

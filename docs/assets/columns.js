@@ -5,6 +5,7 @@
  * pass the result to StockTable.init().
  */
 const PERCENT_SCALE = 100;
+const NON_POSITIVE_GROWTH_STATUS = "non_positive_growth";
 export const NCR_SPEC = {
     key: "net_cash_ratio",
     header: "ncr",
@@ -78,6 +79,23 @@ export function buildMetricCol(spec, accessor) {
         sortValue: (row) => scaleValue(accessor(row), spec),
     };
 }
+function buildPegCol(spec, accessor, statusAccessor) {
+    return {
+        key: spec.key,
+        header: spec.header,
+        type: "num",
+        title: spec.title,
+        toggleable: true,
+        render: (row) => {
+            const value = scaleValue(accessor(row), spec);
+            if (value !== null) {
+                return value.toFixed(spec.decimals) + (spec.suffix ?? "");
+            }
+            return statusAccessor(row) === NON_POSITIVE_GROWTH_STATUS ? "neg" : "-";
+        },
+        sortValue: (row) => scaleValue(accessor(row), spec),
+    };
+}
 export const codeCol = {
     key: "code",
     header: "code",
@@ -109,8 +127,8 @@ export const priceCol = {
     },
     sortValue: (row) => toNumber(row.price),
 };
-export const peg5yCol = buildMetricCol(PEG_5Y_SPEC, (row) => toNumber(row.peg_trailing_5));
-export const peg5y2fCol = buildMetricCol(PEG_5Y_2F_SPEC, (row) => toNumber(row.peg_blended_5y_actual_2f));
+export const peg5yCol = buildPegCol(PEG_5Y_SPEC, (row) => toNumber(row.peg_trailing_5), (row) => toStatus(row.peg_trailing_5_status));
+export const peg5y2fCol = buildPegCol(PEG_5Y_2F_SPEC, (row) => toNumber(row.peg_blended_5y_actual_2f), (row) => toStatus(row.peg_blended_5y_actual_2f_status));
 export const fcfYCol = buildMetricCol(FCF_YIELD_SPEC, (row) => toNumber(row.fcf_yield_avg));
 export const croicCol = buildMetricCol(CROIC_SPEC, (row) => toNumber(row.croic));
 export const COMMON_THRESHOLDS = {
@@ -148,4 +166,7 @@ function scaleValue(value, spec) {
 }
 function toNumber(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function toStatus(value) {
+    return typeof value === "string" ? value : null;
 }

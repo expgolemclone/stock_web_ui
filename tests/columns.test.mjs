@@ -40,6 +40,27 @@ test('canonical metric columns and thresholds match formula_screening values', a
 
   assert.equal(StockColumns.fcfYCol.render({ fcf_yield_avg: 0.1234 }), '12.34%');
   assert.equal(StockColumns.croicCol.sortValue({ croic: 0.151 }), 15.1);
+  assert.equal(
+    StockColumns.peg5yCol.render({
+      peg_trailing_5: null,
+      peg_trailing_5_status: 'non_positive_growth',
+    }),
+    'neg',
+  );
+  assert.equal(
+    StockColumns.peg5y2fCol.render({
+      peg_blended_5y_actual_2f: null,
+      peg_blended_5y_actual_2f_status: 'missing_input',
+    }),
+    '-',
+  );
+  assert.equal(
+    StockColumns.peg5yCol.sortValue({
+      peg_trailing_5: null,
+      peg_trailing_5_status: 'non_positive_growth',
+    }),
+    null,
+  );
   assert.equal(StockColumns.COMMON_THRESHOLDS.net_cash_ratio.good(1.1), true);
   assert.equal(StockColumns.COMMON_THRESHOLDS.per.bad(8), true);
   assert.equal(StockColumns.COMMON_THRESHOLDS.equity_ratio.good(50), true);
