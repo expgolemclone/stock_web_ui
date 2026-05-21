@@ -19,6 +19,7 @@ let _config = null;
 const _state = {
     rows: null,
     priceDate: null,
+    targetPriceDate: null,
     currentTab: "",
     sortKey: "",
     sortDir: "asc",
@@ -48,6 +49,7 @@ function init(config) {
     _config = config;
     _state.rows = null;
     _state.priceDate = null;
+    _state.targetPriceDate = null;
     _state.sortKey = config.defaultSortKey;
     _state.sortDir = config.defaultSortDirection;
     _state.currentTab = "";
@@ -107,13 +109,16 @@ async function _loadMetadata() {
             return;
         }
         const raw = await response.json();
-        _state.priceDate = _normalizePriceDate(raw);
+        const metadata = _normalizePriceMetadata(raw);
+        _state.priceDate = metadata.priceDate;
+        _state.targetPriceDate = metadata.targetPriceDate;
         if (!_state.loading && !_state.error) {
             _render();
         }
     }
     catch (_err) {
         _state.priceDate = null;
+        _state.targetPriceDate = null;
     }
 }
 /* ------------------------------------------------------------------ */
@@ -148,15 +153,17 @@ function _normalizeRows(raw) {
     }
     return [];
 }
-function _normalizePriceDate(raw) {
+function _normalizePriceMetadata(raw) {
     if (!raw || typeof raw !== "object") {
-        return null;
+        return { priceDate: null, targetPriceDate: null };
     }
-    const value = raw.price_date;
-    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        return null;
-    }
-    return value;
+    const record = raw;
+    const priceDate = _normalizeDateString(record.price_date);
+    const targetPriceDate = _normalizeDateString(record.target_price_date) ?? priceDate;
+    return { priceDate, targetPriceDate };
+}
+function _normalizeDateString(value) {
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 function _resolveDefaultTab(rows) {
     if (!_config) {
@@ -255,8 +262,25 @@ function _renderBody(rows) {
             const cellClass = _getColumnClassName(col, "td", extraCls);
             return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
         });
-        return "<tr>" + cells.join("") + "</tr>";
+        const rowClass = _isPriceUnavailable(row) ? ' class="price-unavailable"' : "";
+        return "<tr" + rowClass + ">" + cells.join("") + "</tr>";
     }).join("");
+}
+function _isPriceUnavailable(row) {
+    const hasPriceField = Object.prototype.hasOwnProperty.call(row, "price");
+    const hasPriceDateField = Object.prototype.hasOwnProperty.call(row, "price_date");
+    if (!hasPriceField && !hasPriceDateField) {
+        return false;
+    }
+    const price = row.price;
+    if (typeof price !== "number" || !Number.isFinite(price)) {
+        return true;
+    }
+    if (!_state.targetPriceDate) {
+        return false;
+    }
+    const rowPriceDate = _normalizeDateString(row.price_date);
+    return rowPriceDate === null || rowPriceDate < _state.targetPriceDate;
 }
 function _renderCellContent(col, row, context) {
     if (col.detailContent && _config?.detailModal) {

@@ -67,6 +67,7 @@ interface StockRow {
 interface State {
   rows: StockRow[] | null;
   priceDate: string | null;
+  targetPriceDate: string | null;
   currentTab: string;
   sortKey: string;
   sortDir: SortDirection;
@@ -107,6 +108,7 @@ let _config: StockTableConfig | null = null;
 const _state: State = {
   rows: null,
   priceDate: null,
+  targetPriceDate: null,
   currentTab: "",
   sortKey: "",
   sortDir: "asc",
@@ -143,6 +145,7 @@ function init(config: StockTableConfig): void {
   _config = config;
   _state.rows = null;
   _state.priceDate = null;
+  _state.targetPriceDate = null;
   _state.sortKey = config.defaultSortKey;
   _state.sortDir = config.defaultSortDirection;
   _state.currentTab = "";
@@ -211,12 +214,15 @@ async function _loadMetadata(): Promise<void> {
       return;
     }
     const raw: unknown = await response.json();
-    _state.priceDate = _normalizePriceDate(raw);
+    const metadata: PriceMetadata = _normalizePriceMetadata(raw);
+    _state.priceDate = metadata.priceDate;
+    _state.targetPriceDate = metadata.targetPriceDate;
     if (!_state.loading && !_state.error) {
       _render();
     }
   } catch (_err) {
     _state.priceDate = null;
+    _state.targetPriceDate = null;
   }
 }
 
@@ -256,15 +262,23 @@ function _normalizeRows(raw: unknown): StockRow[] {
   return [];
 }
 
-function _normalizePriceDate(raw: unknown): string | null {
+interface PriceMetadata {
+  priceDate: string | null;
+  targetPriceDate: string | null;
+}
+
+function _normalizePriceMetadata(raw: unknown): PriceMetadata {
   if (!raw || typeof raw !== "object") {
-    return null;
+    return { priceDate: null, targetPriceDate: null };
   }
-  const value: unknown = (raw as Record<string, unknown>).price_date;
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
-  return value;
+  const record = raw as Record<string, unknown>;
+  const priceDate = _normalizeDateString(record.price_date);
+  const targetPriceDate = _normalizeDateString(record.target_price_date) ?? priceDate;
+  return { priceDate, targetPriceDate };
+}
+
+function _normalizeDateString(value: unknown): string | null {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
 function _resolveDefaultTab(rows: StockRow[]): string {
@@ -378,8 +392,26 @@ function _renderBody(rows: StockRow[]): void {
       const cellClass: string = _getColumnClassName(col, "td", extraCls);
       return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
     });
-    return "<tr>" + cells.join("") + "</tr>";
+    const rowClass: string = _isPriceUnavailable(row) ? ' class="price-unavailable"' : "";
+    return "<tr" + rowClass + ">" + cells.join("") + "</tr>";
   }).join("");
+}
+
+function _isPriceUnavailable(row: StockRow): boolean {
+  const hasPriceField = Object.prototype.hasOwnProperty.call(row, "price");
+  const hasPriceDateField = Object.prototype.hasOwnProperty.call(row, "price_date");
+  if (!hasPriceField && !hasPriceDateField) {
+    return false;
+  }
+  const price = row.price;
+  if (typeof price !== "number" || !Number.isFinite(price)) {
+    return true;
+  }
+  if (!_state.targetPriceDate) {
+    return false;
+  }
+  const rowPriceDate = _normalizeDateString(row.price_date);
+  return rowPriceDate === null || rowPriceDate < _state.targetPriceDate;
 }
 
 function _renderCellContent(col: ColumnDef, row: StockRow, context: RenderContext): string {

@@ -253,6 +253,29 @@ test('metadataUrl の取得に失敗しても件数表示を維持する', async
   assert.equal(page.document.getElementById('statusMessage').textContent.trim(), '2 件');
 });
 
+test('株価が未取得または基準日より古い行を薄い表示用クラスにする', async function (t) {
+  const page = await setupTable({
+    rows: [
+      { code: '7203', name: 'Toyota', price: 1000, price_date: '2026-05-20' },
+      { code: '6501', name: 'Hitachi', price: 800, price_date: '2026-05-19' },
+      { code: '1301', name: 'Kyokuyo', price: null, price_date: null },
+    ],
+    metadata: { price_date: '2026-05-20', target_price_date: '2026-05-20' },
+  });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const rows = Array.from(page.document.querySelectorAll('tbody tr'));
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].textContent.includes('7203'), true);
+  assert.equal(rows[0].classList.contains('price-unavailable'), false);
+  assert.equal(rows[1].textContent.includes('6501'), true);
+  assert.equal(rows[1].classList.contains('price-unavailable'), true);
+  assert.equal(rows[2].textContent.includes('1301'), true);
+  assert.equal(rows[2].classList.contains('price-unavailable'), true);
+});
+
 test('ソート中の列を非表示にすると既定ソートへ戻る', async function (t) {
   const page = await setupTable();
   t.after(function () {
