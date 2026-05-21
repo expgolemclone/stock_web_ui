@@ -240,6 +240,11 @@ async function verifyPage(browser, downstream, url) {
       }
     }
 
+    const statusText = await page.locator('#statusMessage').innerText({ timeout: 10_000 });
+    if (!/株価基準日: \d{4}-\d{2}-\d{2}/.test(statusText)) {
+      throw new Error(`${downstream.name}: missing stock price date in status; status was: ${statusText}`);
+    }
+
     if (downstream.name === 'invest_like_legends') {
       await page.locator('[data-tab-key="hikari"]').click({ timeout: 10_000 });
       await page.waitForFunction(

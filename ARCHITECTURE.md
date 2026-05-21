@@ -66,6 +66,7 @@ stock_web_ui/
 
 - `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。任意の `metadataUrl` から `{ "price_date": "YYYY-MM-DD" }` を取得できる場合は、ステータス欄に株価基準日を追加表示する。
 - `StockTableConfig.metadataUrl` を指定した場合、runtime は `{ "price_date": "YYYY-MM-DD" }` を取得し、ステータス欄に `株価基準日: YYYY-MM-DD` を件数と並べて表示する。取得失敗時は行データ表示を優先し、基準日は表示しない。
+- consumer はローカル API では `/api/stock-price-meta`、GitHub Pages などの静的配信では `assets/stock-price-meta.json` を `metadataUrl` に渡す。JSON の `price_date` は `stock_db.prices.date` の最大値であり、DB 取り込み時刻ではない。
 - `stock-table.js` は ESM として配信される一方で `globalThis.StockTable` にも公開され、利用側 `app.js` はこの共有 API を前提に起動する。
 - `columns.js` は ESM として配信される一方で `globalThis.StockColumns` にも公開され、共通の `code` / `name` / `price` / 指標列と閾値を提供する。PEG 列は `*_status === "non_positive_growth"` のとき `neg`、その他の未算出値は `-` と表示する。
 - 共通リンクは `ColumnDef.stockLink` (`monex` / `shikiho` / `yazi`) で指定できる。runtime が `row.code` と `RenderContext.githubPages` から `href` / `linkMode` / `browserKey` を解決する。
@@ -89,7 +90,7 @@ stock_web_ui/
 
 ## 開発フック
 
-- `npm run check:downstream-ui` は `formula_screening`、`invest_like_legends`、`land_value_research` を sibling repo として起動し、Playwright で実画面を確認する。
+- `npm run check:downstream-ui` は `formula_screening`、`invest_like_legends`、`land_value_research` を sibling repo として起動し、Playwright で実画面とステータス欄の株価基準日表示を確認する。
 - 検証は fixture ではなく、各 repo のローカル HTTP サーバーと実 SQLite DB (`stock_db/var/db/stocks.db`、`japan_company_handbook/data/stock_performance.db`、`land_value_research/data/land.db`) を使う。
 - `.githooks/pre-push` は Codex と Claude Code のどちらでも効く共通の強制点で、同じ検証コマンドを呼ぶ。通常の Git checkout では `git config core.hooksPath .githooks` で有効化する。`.git` を持たない jj workspace ではこの Git hook 設定は適用できない。
 - `.claude/hooks/stop_check_downstream_ui.py` は Claude Code の Stop hook から同じ検証コマンドを呼ぶ薄い wrapper であり、判定ロジックは `scripts/check_downstream_ui.mjs` に集約する。

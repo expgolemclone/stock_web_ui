@@ -93,7 +93,7 @@ def _serve_invest_like_legends(port: int) -> None:
 
     db_path = resolve_stocks_db_path()
     stock_names = load_stock_names(db_path)
-    metrics_map = compute_metrics_map(db_path)
+    metrics_map = compute_metrics_map()
     shareholder_rows = load_major_shareholder_rows()
     investors_doc = build_investors_document(
         stock_names=stock_names,
@@ -105,18 +105,10 @@ def _serve_invest_like_legends(port: int) -> None:
         metrics_map=metrics_map,
         shareholder_rows=shareholder_rows,
     )
-    candidate_summaries = [
-        {
-            "id": candidate["id"],
-            "name": candidate["name"],
-            "aliases": candidate["aliases"],
-            "holding_count": candidate["holding_count"],
-            "priced_holding_count": candidate["priced_holding_count"],
-            "total_amount_millions": candidate["total_amount_millions"],
-        }
-        for candidate in candidates_doc
-    ]
-    candidate_details = {candidate["id"]: candidate for candidate in candidates_doc}
+    metadata = build_stock_price_metadata(db_path)
+    app_serve._load_and_enrich_investors = lambda: investors_doc
+    app_serve._load_shareholder_candidates = lambda: candidates_doc
+    app_serve._load_stock_price_metadata = lambda: metadata
 
     app_serve._serve(
         static_root=app_serve._STATIC_ROOT,
@@ -126,12 +118,7 @@ def _serve_invest_like_legends(port: int) -> None:
             tab_aria_label="投資家切替",
         ),
         server_config=_server_config(port),
-        api_routes=app_serve._create_api_routes(
-            investors_doc,
-            candidate_summaries,
-            candidate_details,
-            build_stock_price_metadata(db_path),
-        ),
+        api_routes=app_serve._create_api_routes(),
         yazi_base_dir=app_serve._HANDBOOK_DATA_DIR,
     )
 
