@@ -22,6 +22,7 @@ def main() -> None:
         sys.path.insert(0, str(project_dir))
 
     _disable_browser_startup()
+    _disable_stock_price_auto_refresh()
 
     if args.app == "formula_screening":
         _serve_formula_screening(project_dir, args.port)
@@ -36,6 +37,14 @@ def _disable_browser_startup() -> None:
 
     serve_mod._open_startup_browser = lambda _url: None  # type: ignore[attr-defined]
     serve_mod._release_port_if_needed = lambda _host, _port: None  # type: ignore[attr-defined]
+
+
+def _disable_stock_price_auto_refresh() -> None:
+    import stock_db.storage.prices as prices_mod
+    import stock_db.storage.stocks as stocks_mod
+
+    prices_mod._ensure_prices_fresh_for_api = lambda _conn: None  # type: ignore[attr-defined]
+    stocks_mod._ensure_prices_fresh_for_api = lambda _conn: None  # type: ignore[attr-defined]
 
 
 def _server_config(port: int):
