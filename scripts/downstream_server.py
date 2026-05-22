@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import sqlite3
 import sys
 import tempfile
 from pathlib import Path
@@ -40,11 +39,9 @@ def _disable_browser_startup() -> None:
 
 
 def _disable_stock_price_auto_refresh() -> None:
-    import stock_db.storage.prices as prices_mod
-    import stock_db.storage.stocks as stocks_mod
+    import stock_db.api as stock_db_api
 
-    prices_mod._ensure_prices_fresh_for_api = lambda _conn: None  # type: ignore[attr-defined]
-    stocks_mod._ensure_prices_fresh_for_api = lambda _conn: None  # type: ignore[attr-defined]
+    stock_db_api.ensure_prices_fresh = lambda: None  # type: ignore[assignment]
 
 
 def _server_config(port: int):
@@ -54,37 +51,17 @@ def _server_config(port: int):
 
 
 def _serve_formula_screening(project_dir: Path, port: int) -> None:
-    from formula_screening.screener import run_screening
-    from formula_screening.web import serve_screening
-    from stock_db.paths import STOCKS_DB_PATH
-    from stock_db.storage.connection import get_connection
+    from formula_screening.web import run_screening_strategy_payload, serve_screening_payload
+    from stock_db.api import get_screening_tickers
 
     strategy_path = project_dir / "strategies" / "net_cash_fcf.toml"
-    tickers = _sample_tickers(STOCKS_DB_PATH)
-    with get_connection(STOCKS_DB_PATH) as conn:
-        stocks = run_screening(conn, strategy_path, workers=1, tickers=tickers, return_all=True)
+    tickers = get_screening_tickers(limit=20)
+    payload = run_screening_strategy_payload(strategy_path, tickers=tickers, return_all=True)
 
-    if not stocks:
-        raise RuntimeError(f"formula_screening produced no rows from {STOCKS_DB_PATH}")
+    if not payload:
+        raise RuntimeError("formula_screening produced no rows from stock_db.api")
 
-    serve_screening(stocks[:20], server_config=_server_config(port))
-
-
-def _sample_tickers(db_path: Path, limit: int = 20) -> list[str]:
-    query = """
-        SELECT s.ticker
-        FROM stocks AS s
-        WHERE EXISTS (SELECT 1 FROM prices AS p WHERE p.ticker = s.ticker)
-          AND EXISTS (SELECT 1 FROM financial_items AS f WHERE f.ticker = s.ticker)
-        ORDER BY s.ticker
-        LIMIT ?
-    """
-    with sqlite3.connect(db_path) as conn:
-        rows = conn.execute(query, (limit,)).fetchall()
-    tickers = [str(row[0]) for row in rows]
-    if not tickers:
-        raise RuntimeError(f"no ticker with price and financial data in {db_path}")
-    return tickers
+    serve_screening_payload(payload[:20], server_config=_server_config(port))
 
 
 def _serve_invest_like_legends(port: int) -> None:
@@ -96,12 +73,10 @@ def _serve_invest_like_legends(port: int) -> None:
         compute_metrics_map,
         load_major_shareholder_rows,
         load_stock_names,
-        resolve_stocks_db_path,
     )
     from stock_web_ui.page import IndexPage
 
-    db_path = resolve_stocks_db_path()
-    stock_names = load_stock_names(db_path)
+    stock_names = load_stock_names()
     metrics_map = compute_metrics_map()
     shareholder_rows = load_major_shareholder_rows()
     investors_doc = build_investors_document(
@@ -114,7 +89,7 @@ def _serve_invest_like_legends(port: int) -> None:
         metrics_map=metrics_map,
         shareholder_rows=shareholder_rows,
     )
-    metadata = build_stock_price_metadata(db_path)
+    metadata = build_stock_price_metadata()
     app_serve._load_and_enrich_investors = lambda: investors_doc
     app_serve._load_shareholder_candidates = lambda: candidates_doc
     app_serve._load_stock_price_metadata = lambda: metadata

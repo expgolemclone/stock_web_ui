@@ -14,7 +14,6 @@ const STATE_FILE = join(STATE_DIR, 'downstream-ui-check-state.json');
 const FORCE = process.argv.includes('--force');
 
 const DATA_FILES = [
-  ['stock_db', 'var/db/stocks.db'],
   ['japan_company_handbook', 'data/stock_performance.db'],
   ['land_value_research', 'data/land.db'],
 ];
@@ -176,7 +175,6 @@ function startServer(repo, app, port) {
         ...process.env,
         HANDBOOK_DB_PATH: join(PARENT, 'japan_company_handbook', 'data', 'stock_performance.db'),
         STOCK_DB_VAR_DIR: join(PARENT, 'stock_db', 'var'),
-        STOCKS_DB_PATH: join(PARENT, 'stock_db', 'var', 'db', 'stocks.db'),
         STOCK_WEB_UI_YAZI_BASE_DIR: join(PARENT, 'japan_company_handbook', 'data'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
