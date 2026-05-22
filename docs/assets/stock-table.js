@@ -258,12 +258,14 @@ function _renderBody(rows) {
     const cols = _config.columns;
     const context = { githubPages: !!_config.githubPages };
     _el.tbody.innerHTML = rows.map(function (row) {
+        const priceUnavailable = _isPriceUnavailable(row);
         const cells = cols.map(function (col) {
             const extraCls = _metricCls(col, row);
-            const cellClass = _getColumnClassName(col, "td", extraCls);
-            return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
+            const cautionCls = col.key === "price" && priceUnavailable ? " price-caution-cell" : "";
+            const cellClass = _getColumnClassName(col, "td", extraCls + cautionCls);
+            return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context, priceUnavailable) + "</td>";
         });
-        const rowClass = _isPriceUnavailable(row) ? ' class="price-unavailable"' : "";
+        const rowClass = priceUnavailable ? ' class="price-unavailable"' : "";
         return "<tr" + rowClass + ">" + cells.join("") + "</tr>";
     }).join("");
 }
@@ -283,20 +285,24 @@ function _isPriceUnavailable(row) {
     const rowPriceDate = _normalizeDateString(row.price_date);
     return rowPriceDate === null || rowPriceDate < _state.targetPriceDate;
 }
-function _renderCellContent(col, row, context) {
+function _renderCellContent(col, row, context, priceUnavailable) {
+    let renderedContent;
     if (col.detailContent && _config?.detailModal) {
         const detail = col.detailContent(row);
         if (detail) {
             const idx = _detailIndex++;
             _detailMap[idx] = detail;
-            return '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+            renderedContent = '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+            return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
         }
-        return col.render(row);
+        renderedContent = col.render(row);
+        return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
     }
     const content = col.render(row);
     const resolvedLink = _resolveColumnLink(col, row, context);
     if (resolvedLink === null) {
-        return content;
+        renderedContent = content;
+        return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
     }
     const attrs = [
         'href="' + escapeHtml(resolvedLink.href) + '"',
@@ -309,7 +315,30 @@ function _renderCellContent(col, row, context) {
     else if (resolvedLink.linkMode === "yazi") {
         attrs.push("data-yazi");
     }
-    return "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+    renderedContent = "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+    return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+}
+function _renderPriceCaution(col, row, renderedContent, priceUnavailable) {
+    if (col.key !== "price" || !priceUnavailable) {
+        return renderedContent;
+    }
+    const label = _getPriceCautionLabel(row);
+    return '<span class="price-caution-value">' + renderedContent + '</span>'
+        + '<span class="price-caution-badge" role="img" aria-label="' + escapeHtml(label) + '" title="' + escapeHtml(label) + '">!</span>';
+}
+function _getPriceCautionLabel(row) {
+    const price = row.price;
+    if (typeof price !== "number" || !Number.isFinite(price)) {
+        return "株価未取得";
+    }
+    const rowPriceDate = _normalizeDateString(row.price_date);
+    if (rowPriceDate && _state.targetPriceDate) {
+        return "株価が古い: " + rowPriceDate + " / 基準日: " + _state.targetPriceDate;
+    }
+    if (_state.targetPriceDate) {
+        return "株価の日付未取得 / 基準日: " + _state.targetPriceDate;
+    }
+    return "株価未取得";
 }
 function _resolveColumnLink(col, row, context) {
     if (col.stockLink) {

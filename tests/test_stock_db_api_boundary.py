@@ -10,6 +10,7 @@ def test_downstream_checks_use_stock_db_public_api() -> None:
         "sqlite3",
         "stock_db.paths",
         "stock_db.storage",
+        "stock_db.sources.price_refresh",
         "STOCKS_DB_PATH",
         "get_connection(",
     )

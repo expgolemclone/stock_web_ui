@@ -393,12 +393,14 @@ function _renderBody(rows: StockRow[]): void {
   const context: RenderContext = { githubPages: !!_config.githubPages };
 
   _el.tbody.innerHTML = rows.map(function (row: StockRow): string {
+    const priceUnavailable: boolean = _isPriceUnavailable(row);
     const cells: string[] = cols.map(function (col: ColumnDef): string {
       const extraCls: string = _metricCls(col, row);
-      const cellClass: string = _getColumnClassName(col, "td", extraCls);
-      return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context) + "</td>";
+      const cautionCls: string = col.key === "price" && priceUnavailable ? " price-caution-cell" : "";
+      const cellClass: string = _getColumnClassName(col, "td", extraCls + cautionCls);
+      return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context, priceUnavailable) + "</td>";
     });
-    const rowClass: string = _isPriceUnavailable(row) ? ' class="price-unavailable"' : "";
+    const rowClass: string = priceUnavailable ? ' class="price-unavailable"' : "";
     return "<tr" + rowClass + ">" + cells.join("") + "</tr>";
   }).join("");
 }
@@ -420,21 +422,31 @@ function _isPriceUnavailable(row: StockRow): boolean {
   return rowPriceDate === null || rowPriceDate < _state.targetPriceDate;
 }
 
-function _renderCellContent(col: ColumnDef, row: StockRow, context: RenderContext): string {
+function _renderCellContent(
+  col: ColumnDef,
+  row: StockRow,
+  context: RenderContext,
+  priceUnavailable: boolean,
+): string {
+  let renderedContent: string;
+
   if (col.detailContent && _config?.detailModal) {
     const detail: string | null = col.detailContent(row);
     if (detail) {
       const idx: number = _detailIndex++;
       _detailMap[idx] = detail;
-      return '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+      renderedContent = '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+      return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
     }
-    return col.render(row);
+    renderedContent = col.render(row);
+    return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
   }
 
   const content: string = col.render(row);
   const resolvedLink: ResolvedLink | null = _resolveColumnLink(col, row, context);
   if (resolvedLink === null) {
-    return content;
+    renderedContent = content;
+    return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
   }
 
   const attrs: string[] = [
@@ -448,7 +460,39 @@ function _renderCellContent(col: ColumnDef, row: StockRow, context: RenderContex
     attrs.push("data-yazi");
   }
 
-  return "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+  renderedContent = "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+  return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+}
+
+function _renderPriceCaution(
+  col: ColumnDef,
+  row: StockRow,
+  renderedContent: string,
+  priceUnavailable: boolean,
+): string {
+  if (col.key !== "price" || !priceUnavailable) {
+    return renderedContent;
+  }
+
+  const label: string = _getPriceCautionLabel(row);
+  return '<span class="price-caution-value">' + renderedContent + '</span>'
+    + '<span class="price-caution-badge" role="img" aria-label="' + escapeHtml(label) + '" title="' + escapeHtml(label) + '">!</span>';
+}
+
+function _getPriceCautionLabel(row: StockRow): string {
+  const price = row.price;
+  if (typeof price !== "number" || !Number.isFinite(price)) {
+    return "株価未取得";
+  }
+
+  const rowPriceDate: string | null = _normalizeDateString(row.price_date);
+  if (rowPriceDate && _state.targetPriceDate) {
+    return "株価が古い: " + rowPriceDate + " / 基準日: " + _state.targetPriceDate;
+  }
+  if (_state.targetPriceDate) {
+    return "株価の日付未取得 / 基準日: " + _state.targetPriceDate;
+  }
+  return "株価未取得";
 }
 
 function _resolveColumnLink(col: ColumnDef, row: StockRow, context: RenderContext): ResolvedLink | null {

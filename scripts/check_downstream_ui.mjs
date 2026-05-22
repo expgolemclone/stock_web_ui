@@ -174,7 +174,7 @@ function startServer(repo, app, port) {
       env: {
         ...process.env,
         HANDBOOK_DB_PATH: join(PARENT, 'japan_company_handbook', 'data', 'stock_performance.db'),
-        STOCK_DB_VAR_DIR: join(PARENT, 'stock_db', 'var'),
+        STOCK_DB_VAR_DIR: process.env.STOCK_DB_VAR_DIR ?? join(PARENT, 'stock_db', 'var'),
         STOCK_WEB_UI_YAZI_BASE_DIR: join(PARENT, 'japan_company_handbook', 'data'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
