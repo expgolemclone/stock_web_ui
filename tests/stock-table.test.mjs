@@ -235,6 +235,64 @@ test('初期表示で非表示列が見出しと本文の両方に反映され�
   assert.ok(!getToggleChip(page.document, 'per').classList.contains('active'));
 });
 
+test('code と name は横スクロール時の固定列クラスを持つ', async function (t) {
+  const page = await setupTable();
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.ok(getHeaderCell(page.document, 'code').classList.contains('sticky-col'));
+  assert.ok(getHeaderCell(page.document, 'code').classList.contains('sticky-code'));
+  assert.ok(getHeaderCell(page.document, 'code').classList.contains('sticky-left-0'));
+  assert.ok(getHeaderCell(page.document, 'name').classList.contains('sticky-col'));
+  assert.ok(getHeaderCell(page.document, 'name').classList.contains('sticky-name'));
+  assert.ok(getHeaderCell(page.document, 'name').classList.contains('sticky-left-code'));
+  assert.ok(!getHeaderCell(page.document, 'per').classList.contains('sticky-col'));
+  assert.ok(getColumnCells(page.document, 'code').every(function (cell) {
+    return cell.classList.contains('sticky-col')
+      && cell.classList.contains('sticky-code')
+      && cell.classList.contains('sticky-left-0');
+  }));
+  assert.ok(getColumnCells(page.document, 'name').every(function (cell) {
+    return cell.classList.contains('sticky-col')
+      && cell.classList.contains('sticky-name')
+      && cell.classList.contains('sticky-left-code');
+  }));
+});
+
+test('name だけの表では name を左端固定にする', async function (t) {
+  const page = await setupTable({
+    rows: [{ name: 'Shareholder A' }, { name: 'Shareholder B' }],
+    columns: [
+      {
+        key: 'name',
+        header: 'shareholder',
+        type: 'name',
+        render: (row) => String(row.name ?? ''),
+      },
+      {
+        key: 'amount',
+        header: 'amount',
+        type: 'num',
+        render: (row) => String(row.amount ?? '-'),
+      },
+    ],
+  });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.ok(getHeaderCell(page.document, 'name').classList.contains('sticky-col'));
+  assert.ok(getHeaderCell(page.document, 'name').classList.contains('sticky-name'));
+  assert.ok(getHeaderCell(page.document, 'name').classList.contains('sticky-left-0'));
+  assert.ok(!getHeaderCell(page.document, 'amount').classList.contains('sticky-col'));
+  assert.ok(getColumnCells(page.document, 'name').every(function (cell) {
+    return cell.classList.contains('sticky-col')
+      && cell.classList.contains('sticky-name')
+      && cell.classList.contains('sticky-left-0');
+  }));
+});
+
 test('metadataUrl の価格基準日をステータス欄に表示する', async function (t) {
   const page = await setupTable({ metadata: { price_date: '2026-05-15' } });
   t.after(function () {

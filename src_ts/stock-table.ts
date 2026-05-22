@@ -90,6 +90,11 @@ interface ResolvedLink {
   browserKey?: string;
 }
 
+interface StickyColumnPlacement {
+  keyClass: string;
+  leftClass: string;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
@@ -98,6 +103,7 @@ const ASC_ARROW = "\u25B2";
 const DESC_ARROW = "\u25BC";
 const INACTIVE_ARROW = "\u25BD";
 const HIDDEN_COLUMNS_KEY = "hiddenColumns";
+const STICKY_COLUMN_KEYS = ["code", "name"];
 
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
@@ -691,10 +697,40 @@ function _getColumnClassName(col: ColumnDef, element: "th" | "td", extraClass?: 
   if (_isColumnHidden(col.key)) {
     classes.push("hidden-col");
   }
+  const stickyPlacement: StickyColumnPlacement | null = _getStickyColumnPlacement(col);
+  if (stickyPlacement) {
+    classes.push("sticky-col", stickyPlacement.keyClass, stickyPlacement.leftClass);
+  }
   if (extraClass) {
     classes.push(extraClass.trim());
   }
   return classes.filter(Boolean).join(" ");
+}
+
+function _getStickyColumnPlacement(col: ColumnDef): StickyColumnPlacement | null {
+  if (!_config || _isColumnHidden(col.key) || !_isStickyColumnKey(col.key)) {
+    return null;
+  }
+
+  const stickyColumns: ColumnDef[] = _config.columns.filter(function (candidate: ColumnDef): boolean {
+    return !_isColumnHidden(candidate.key) && _isStickyColumnKey(candidate.key);
+  });
+  const index: number = stickyColumns.findIndex(function (candidate: ColumnDef): boolean {
+    return candidate.key === col.key;
+  });
+  if (index < 0) {
+    return null;
+  }
+
+  const firstKey: string = stickyColumns[0]?.key || "";
+  return {
+    keyClass: col.key === "code" ? "sticky-code" : "sticky-name",
+    leftClass: index === 0 ? "sticky-left-0" : "sticky-left-" + firstKey,
+  };
+}
+
+function _isStickyColumnKey(key: string): boolean {
+  return STICKY_COLUMN_KEYS.includes(key);
 }
 
 function _resetSortToDefault(): void {

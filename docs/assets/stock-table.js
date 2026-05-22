@@ -12,6 +12,7 @@ const ASC_ARROW = "\u25B2";
 const DESC_ARROW = "\u25BC";
 const INACTIVE_ARROW = "\u25BD";
 const HIDDEN_COLUMNS_KEY = "hiddenColumns";
+const STICKY_COLUMN_KEYS = ["code", "name"];
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
 /* ------------------------------------------------------------------ */
@@ -527,10 +528,36 @@ function _getColumnClassName(col, element, extraClass) {
     if (_isColumnHidden(col.key)) {
         classes.push("hidden-col");
     }
+    const stickyPlacement = _getStickyColumnPlacement(col);
+    if (stickyPlacement) {
+        classes.push("sticky-col", stickyPlacement.keyClass, stickyPlacement.leftClass);
+    }
     if (extraClass) {
         classes.push(extraClass.trim());
     }
     return classes.filter(Boolean).join(" ");
+}
+function _getStickyColumnPlacement(col) {
+    if (!_config || _isColumnHidden(col.key) || !_isStickyColumnKey(col.key)) {
+        return null;
+    }
+    const stickyColumns = _config.columns.filter(function (candidate) {
+        return !_isColumnHidden(candidate.key) && _isStickyColumnKey(candidate.key);
+    });
+    const index = stickyColumns.findIndex(function (candidate) {
+        return candidate.key === col.key;
+    });
+    if (index < 0) {
+        return null;
+    }
+    const firstKey = stickyColumns[0]?.key || "";
+    return {
+        keyClass: col.key === "code" ? "sticky-code" : "sticky-name",
+        leftClass: index === 0 ? "sticky-left-0" : "sticky-left-" + firstKey,
+    };
+}
+function _isStickyColumnKey(key) {
+    return STICKY_COLUMN_KEYS.includes(key);
 }
 function _resetSortToDefault() {
     if (!_config) {

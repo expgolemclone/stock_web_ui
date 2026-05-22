@@ -24,20 +24,20 @@ export declare function buildMetricCol(spec: MetricColSpec, accessor: MetricAcce
 export declare const codeCol: ColumnDef;
 export declare const nameCol: ColumnDef;
 export declare const priceCol: ColumnDef;
-export declare const peg5yCol: ColumnDef;
-export declare const peg5y2fCol: ColumnDef;
 export declare const fcfYCol: ColumnDef;
 export declare const croicCol: ColumnDef;
+export declare const peg5yCol: ColumnDef;
+export declare const peg5y2fCol: ColumnDef;
 export declare const COMMON_THRESHOLDS: Record<string, MetricThreshold>;
 export declare const StockColumns: {
     buildMetricCol: typeof buildMetricCol;
     codeCol: ColumnDef;
     nameCol: ColumnDef;
     priceCol: ColumnDef;
-    peg5yCol: ColumnDef;
-    peg5y2fCol: ColumnDef;
     fcfYCol: ColumnDef;
     croicCol: ColumnDef;
+    peg5yCol: ColumnDef;
+    peg5y2fCol: ColumnDef;
     NCR_SPEC: MetricColSpec;
     PER_A_SPEC: MetricColSpec;
     PER_C_SPEC: MetricColSpec;

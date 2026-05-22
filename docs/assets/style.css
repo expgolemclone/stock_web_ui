@@ -18,6 +18,12 @@
   --monex-bg: #3a2510;
   --monex-color: #f0a050;
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+  --sticky-code-width: 86px;
+  --sticky-name-width: 240px;
+  --table-row-bg: rgba(22, 33, 62, 0.88);
+  --table-row-even-bg: rgba(30, 42, 74, 0.9);
+  --table-row-stale-bg: rgba(18, 24, 42, 0.78);
+  --table-row-stale-hover-bg: rgba(29, 38, 64, 0.86);
 }
 
 * {
@@ -152,10 +158,54 @@ thead th {
   border-bottom: 1px solid var(--border);
 }
 
+thead th.sticky-col {
+  z-index: 4;
+}
+
 .column-position {
   background: var(--position-thead-bg);
   color: var(--position-thead-text);
   border-bottom-color: var(--position-thead-border);
+}
+
+.sticky-col {
+  position: sticky;
+}
+
+td.sticky-col {
+  z-index: 1;
+  background: var(--row-bg);
+  background-clip: padding-box;
+  box-shadow: 1px 0 0 var(--border);
+}
+
+thead th.sticky-col {
+  background: var(--thead-bg);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.sticky-code {
+  width: var(--sticky-code-width);
+  min-width: var(--sticky-code-width);
+  max-width: var(--sticky-code-width);
+}
+
+.sticky-name {
+  width: var(--sticky-name-width);
+  min-width: var(--sticky-name-width);
+  max-width: var(--sticky-name-width);
+}
+
+.sticky-left-0 {
+  left: 0;
+}
+
+.sticky-left-code {
+  left: var(--sticky-code-width);
+}
+
+.sticky-left-name {
+  left: var(--sticky-name-width);
 }
 
 .sort-button {
@@ -188,25 +238,27 @@ thead th:hover .sort-button,
 }
 
 tbody tr {
+  --row-bg: var(--table-row-bg);
+  background: var(--row-bg);
   border-bottom: 1px solid var(--border);
   transition: background-color 0.15s;
 }
 
 tbody tr:nth-child(even) {
-  background: rgba(30, 42, 74, 0.9);
+  --row-bg: var(--table-row-even-bg);
 }
 
 tbody tr:hover {
-  background: var(--row-hover);
+  --row-bg: var(--row-hover);
 }
 
 tbody tr.price-unavailable,
 tbody tr.price-unavailable:nth-child(even) {
-  background: rgba(18, 24, 42, 0.78);
+  --row-bg: var(--table-row-stale-bg);
 }
 
 tbody tr.price-unavailable:hover {
-  background: rgba(29, 38, 64, 0.86);
+  --row-bg: var(--table-row-stale-hover-bg);
 }
 
 tbody tr.price-unavailable td {
@@ -473,6 +525,11 @@ a.monex:hover {
 
   table {
     min-width: 680px;
+  }
+
+  :root {
+    --sticky-code-width: 74px;
+    --sticky-name-width: 180px;
   }
 
   td,

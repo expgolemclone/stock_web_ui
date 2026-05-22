@@ -67,8 +67,9 @@ stock_web_ui/
 - `StockTable.init(config)` に各プロジェクトの `app.ts` がカラム定義、閾値、ソート設定、データ URL を注入する。任意の `metadataUrl` から `{ "price_date": "YYYY-MM-DD", "target_price_date": "YYYY-MM-DD" }` を取得できる場合は、ステータス欄に株価基準日を追加表示する。
 - `StockTableConfig.metadataUrl` を指定した場合、runtime は `{ "price_date": "YYYY-MM-DD" }` 互換の metadata を取得し、ステータス欄に `株価基準日: YYYY-MM-DD` を件数と並べて表示する。`target_price_date` がある場合は行ごとの `price_date` と比較し、未取得または古い株価の行に `price-unavailable` を付ける。取得失敗時は行データ表示を優先し、基準日は表示しない。
 - consumer はローカル API では `/api/stock-price-meta`、GitHub Pages などの静的配信では `assets/stock-price-meta.json` を `metadataUrl` に渡す。JSON の `price_date` は `stock_db` 公開 API が返す株価基準日であり、DB 取り込み時刻ではない。`target_price_date` がない古い metadata では `price_date` を判定基準として扱う。
+- 表示中の `code` / `name` カラムは横スクロール時の左固定列になる。`code,name` の両方がある表では `code` を左端、`name` をその右に固定し、`name` だけの表では `name` を左端に固定する。
 - `stock-table.js` は ESM として配信される一方で `globalThis.StockTable` にも公開され、利用側 `app.js` はこの共有 API を前提に起動する。
-- `columns.js` は ESM として配信される一方で `globalThis.StockColumns` にも公開され、共通の `code` / `name` / `price` / 指標列と閾値を提供する。PEG 列は `*_status === "non_positive_growth"` のとき `neg`、その他の未算出値は `-` と表示する。
+- `columns.js` は ESM として配信される一方で `globalThis.StockColumns` にも公開され、共通の `code` / `name` / `price` / 指標列と閾値を提供する。指標の共有順序は FCF 系を PEG 系より前に置く。PEG 列は `*_status === "non_positive_growth"` のとき `neg`、その他の未算出値は `-` と表示する。
 - 共通リンクは `ColumnDef.stockLink` (`monex` / `shikiho` / `yazi`) で指定できる。runtime が `row.code` と `RenderContext.githubPages` から `href` / `linkMode` / `browserKey` を解決する。
 - `code` / `name` / `price` の canonical mapping は `monex` / `yazi` / `shikiho` とする。
 - `yazi` の canonical behavior は「ローカルでは `/open-yazi/{code}`、静的配信では非リンク」であり、consumer は特別な理由がない限り `stockLink: "yazi"` をそのまま使う。

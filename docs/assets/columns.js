@@ -37,6 +37,14 @@ export const EQUITY_SPEC = {
     decimals: 1,
     suffix: "%",
 };
+const FCF_YIELD_SPEC = {
+    key: "fcf_yield_avg",
+    header: "fcf_10y%",
+    title: "過去10期の平均FCF / 時価総額",
+    decimals: 2,
+    scale: PERCENT_SCALE,
+    suffix: "%",
+};
 const PEG_5Y_SPEC = {
     key: "peg_trailing_5",
     header: "peg_5y",
@@ -48,14 +56,6 @@ const PEG_5Y_2F_SPEC = {
     header: "peg_5y2f",
     title: "来期予想PER / (過去5年実績+2期予想)EPS CAGR[%]",
     decimals: 2,
-};
-const FCF_YIELD_SPEC = {
-    key: "fcf_yield_avg",
-    header: "fcf_10y%",
-    title: "過去10期の平均FCF / 時価総額",
-    decimals: 2,
-    scale: PERCENT_SCALE,
-    suffix: "%",
 };
 const CROIC_SPEC = {
     key: "croic",
@@ -127,10 +127,10 @@ export const priceCol = {
     },
     sortValue: (row) => toNumber(row.price),
 };
-export const peg5yCol = buildPegCol(PEG_5Y_SPEC, (row) => toNumber(row.peg_trailing_5), (row) => toStatus(row.peg_trailing_5_status));
-export const peg5y2fCol = buildPegCol(PEG_5Y_2F_SPEC, (row) => toNumber(row.peg_blended_5y_actual_2f), (row) => toStatus(row.peg_blended_5y_actual_2f_status));
 export const fcfYCol = buildMetricCol(FCF_YIELD_SPEC, (row) => toNumber(row.fcf_yield_avg));
 export const croicCol = buildMetricCol(CROIC_SPEC, (row) => toNumber(row.croic));
+export const peg5yCol = buildPegCol(PEG_5Y_SPEC, (row) => toNumber(row.peg_trailing_5), (row) => toStatus(row.peg_trailing_5_status));
+export const peg5y2fCol = buildPegCol(PEG_5Y_2F_SPEC, (row) => toNumber(row.peg_blended_5y_actual_2f), (row) => toStatus(row.peg_blended_5y_actual_2f_status));
 export const COMMON_THRESHOLDS = {
     net_cash_ratio: { good: (v) => v > 1 },
     per_actual: { good: (v) => v > 0 && v <= 7, bad: (v) => v > 7 },
@@ -145,10 +145,10 @@ export const StockColumns = {
     codeCol,
     nameCol,
     priceCol,
-    peg5yCol,
-    peg5y2fCol,
     fcfYCol,
     croicCol,
+    peg5yCol,
+    peg5y2fCol,
     NCR_SPEC,
     PER_A_SPEC,
     PER_C_SPEC,
