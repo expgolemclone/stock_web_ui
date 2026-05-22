@@ -38,6 +38,10 @@ test('buildMetricCol renders nulls and scaled numeric values consistently', asyn
 test('canonical metric columns and thresholds match formula_screening values', async function () {
   const { StockColumns } = await loadColumnsModule();
 
+  assert.equal(
+    StockColumns.NCR_SPEC.title,
+    '(流動資産 - 棚卸資産 + 有価証券 * 0.7 - 流動負債 - 固定負債) / 時価総額',
+  );
   assert.equal(StockColumns.fcfYCol.render({ fcf_yield_avg: 0.1234 }), '12.34%');
   assert.equal(StockColumns.croicCol.sortValue({ croic: 0.151 }), 15.1);
   assert.equal(

@@ -26,7 +26,7 @@ const NON_POSITIVE_GROWTH_STATUS = "non_positive_growth";
 export const NCR_SPEC: MetricColSpec = {
   key: "net_cash_ratio",
   header: "ncr",
-  title: "(流動資産 - 棚卸資産 + 有価証券 * 0.7) / 時価総額",
+  title: "(流動資産 - 棚卸資産 + 有価証券 * 0.7 - 流動負債 - 固定負債) / 時価総額",
   decimals: 2,
 };
 
