@@ -57,7 +57,15 @@ test('canonical metric columns and thresholds match formula_screening values', a
   assert.ok(
     Object.keys(StockColumns).indexOf('fcfYCol') < Object.keys(StockColumns).indexOf('peg5yCol'),
   );
+  assert.equal(
+    StockColumns.fcfYCol.title,
+    '平均(過去10期の各期FCF / 現在の時価総額) * 100',
+  );
   assert.equal(StockColumns.fcfYCol.render({ fcf_yield_avg: 0.1234 }), '12.34%');
+  assert.equal(
+    StockColumns.croicCol.title,
+    'FCF / (自己資本 + 有利子負債) * 100',
+  );
   assert.equal(StockColumns.croicCol.sortValue({ croic: 0.151 }), 15.1);
   assert.equal(
     StockColumns.peg5yCol.render({

@@ -71,7 +71,7 @@ export const EQUITY_SPEC: MetricColSpec = {
 const FCF_YIELD_SPEC: MetricColSpec = {
   key: "fcf_yield_avg",
   header: "fcf_10y%",
-  title: "過去10期の平均FCF / 時価総額",
+  title: "平均(過去10期の各期FCF / 現在の時価総額) * 100",
   decimals: 2,
   scale: PERCENT_SCALE,
   suffix: "%",
@@ -94,7 +94,7 @@ const PEG_5Y_2F_SPEC: MetricColSpec = {
 const CROIC_SPEC: MetricColSpec = {
   key: "croic",
   header: "croic%",
-  title: "FCF / (自己資本 + 有利子負債)",
+  title: "FCF / (自己資本 + 有利子負債) * 100",
   decimals: 2,
   scale: PERCENT_SCALE,
   suffix: "%",
