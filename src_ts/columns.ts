@@ -170,6 +170,7 @@ export const priceCol: ColumnDef = {
   type: "num",
   title: "株価（終値）",
   toggleable: true,
+  stockLink: "buffett_code",
   render: (row: Row): string => {
     const value = toNumber(row.price);
     return value !== null

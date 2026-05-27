@@ -27,10 +27,12 @@ def test_load_browser_config_reads_config_dir(monkeypatch, tmp_path: Path) -> No
                 "[browsers]",
                 "shikiho = \"google-chrome\"",
                 "monex = \"firefox\"",
+                "buffett_code = \"chromium\"",
                 "",
                 "[allowed_url_prefixes]",
                 "shikiho = \"https://shikiho.example/\"",
                 "monex = \"https://monex.example/\"",
+                "buffett_code = \"https://buffett.example/\"",
             ]
         ) + "\n",
         encoding="utf-8",
@@ -43,6 +45,8 @@ def test_load_browser_config_reads_config_dir(monkeypatch, tmp_path: Path) -> No
     assert config.entries["shikiho"].allowed_url_prefix == "https://shikiho.example/"
     assert config.entries["monex"].command == "firefox"
     assert config.entries["monex"].allowed_url_prefix == "https://monex.example/"
+    assert config.entries["buffett_code"].command == "chromium"
+    assert config.entries["buffett_code"].allowed_url_prefix == "https://buffett.example/"
 
 
 def test_load_yazi_config_reads_cli_defaults(monkeypatch, tmp_path: Path) -> None:

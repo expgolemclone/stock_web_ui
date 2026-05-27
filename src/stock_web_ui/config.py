@@ -30,11 +30,13 @@ class _CliDefaultsToml(TypedDict):
 class _BrowsersSection(TypedDict):
     shikiho: str
     monex: str
+    buffett_code: str
 
 
 class _AllowedUrlPrefixesSection(TypedDict):
     shikiho: str
     monex: str
+    buffett_code: str
 
 
 class _MagicNumbersToml(TypedDict):

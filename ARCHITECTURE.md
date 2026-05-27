@@ -70,8 +70,8 @@ stock_web_ui/
 - 表示中の `code` / `name` カラムは横スクロール時の左固定列になる。`code,name` の両方がある表では `code` を左端、`name` をその右に固定し、`name` だけの表では `name` を左端に固定する。
 - `stock-table.js` は ESM として配信される一方で `globalThis.StockTable` にも公開され、利用側 `app.js` はこの共有 API を前提に起動する。
 - `columns.js` は ESM として配信される一方で `globalThis.StockColumns` にも公開され、共通の `code` / `name` / `price` / 指標列と閾値を提供する。指標の共有順序は FCF 系を PEG 系より前に置く。PEG 列は未算出理由を `missing_input -> miss`, `insufficient_history -> hist`, `non_positive_per -> per-`, `non_positive_eps -> eps-`, `non_positive_growth -> growth-` と表示し、未知 status / status なしは `-` と表示する。
-- 共通リンクは `ColumnDef.stockLink` (`monex` / `shikiho` / `yazi`) で指定できる。runtime が `row.code` と `RenderContext.githubPages` から `href` / `linkMode` / `browserKey` を解決する。
-- `code` / `name` / `ncr` (`net_cash_ratio`) の canonical mapping は `monex` / `yazi` / `shikiho` とし、`price` はリンクを持たない。
+- 共通リンクは `ColumnDef.stockLink` (`monex` / `shikiho` / `buffett_code` / `yazi`) で指定できる。runtime が `row.code` と `RenderContext.githubPages` から `href` / `linkMode` / `browserKey` を解決する。
+- `code` / `name` / `ncr` (`net_cash_ratio`) / `price` の canonical mapping は `monex` / `yazi` / `shikiho` / `buffett_code` とする。
 - `yazi` の canonical behavior は「ローカルでは `/open-yazi/{code}`、静的配信では非リンク」であり、consumer は特別な理由がない限り `stockLink: "yazi"` をそのまま使う。
 - 既存の `ColumnDef.linkHref(row, context)` と `linkMode` / `browserKey` も後方互換のため維持し、`stockLink` を使わない利用側は従来どおり個別定義できる。ただし `yazi` 挙動を repo ごとに変えない用途に限る。
 - `RenderContext.githubPages` により、同じカラム定義から「ローカルでは `/open-yazi`」「静的配信では四季報 URL」「静的配信では yazi 列を非リンク化」などを切り替えられる。

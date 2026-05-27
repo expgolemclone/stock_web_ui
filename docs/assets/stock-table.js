@@ -393,7 +393,9 @@ function _resolveStockLink(stockLink, row, context) {
     }
     const href = stockLink === "monex"
         ? _buildMonexUrl(code)
-        : _buildShikihoUrl(code);
+        : stockLink === "shikiho"
+            ? _buildShikihoUrl(code)
+            : _buildBuffettCodeUrl(code);
     if (context.githubPages) {
         return { href, linkMode: "direct" };
     }
@@ -408,6 +410,9 @@ function _buildMonexUrl(code) {
 }
 function _buildShikihoUrl(code) {
     return "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(code) + "/shikiho";
+}
+function _buildBuffettCodeUrl(code) {
+    return "https://www.buffett-code.com/company/" + encodeURIComponent(code) + "/";
 }
 function _renderMessageRow(message) {
     if (!_el.tbody || !_config) {

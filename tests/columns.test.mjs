@@ -13,7 +13,7 @@ test('StockColumns exposes the shared column API on globalThis', async function 
   assert.equal(globalThis.StockColumns, mod.StockColumns);
   assert.equal(mod.StockColumns.codeCol.stockLink, 'monex');
   assert.equal(mod.StockColumns.nameCol.stockLink, 'yazi');
-  assert.equal(mod.StockColumns.priceCol.stockLink, undefined);
+  assert.equal(mod.StockColumns.priceCol.stockLink, 'buffett_code');
   assert.equal(mod.StockColumns.NCR_SPEC.stockLink, 'shikiho');
 
   if (previous === undefined) {

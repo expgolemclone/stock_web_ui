@@ -516,3 +516,64 @@ test('stockLink=shikiho は静的環境で direct リンクにする', async fun
   assert.equal(anchor.hasAttribute('data-browser'), false);
   assert.equal(anchor.hasAttribute('data-yazi'), false);
 });
+
+test('stockLink=buffett_code はローカル環境で browser 経由リンクにする', async function (t) {
+  const rows = [{ code: '7203', name: 'Toyota', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'buffett_code',
+    },
+  ];
+  const page = await setupTable({ rows, columns });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'price');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://www.buffett-code.com/company/7203/');
+  assert.equal(anchor.getAttribute('data-browser'), 'buffett_code');
+});
+
+test('stockLink=buffett_code は静的環境で direct リンクにする', async function (t) {
+  const rows = [{ code: '7203', name: 'Toyota', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'buffett_code',
+    },
+  ];
+  const page = await setupTable({ rows, columns, githubPages: true });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'price');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://www.buffett-code.com/company/7203/');
+  assert.equal(anchor.hasAttribute('data-browser'), false);
+  assert.equal(anchor.hasAttribute('data-yazi'), false);
+});

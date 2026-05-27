@@ -19,7 +19,7 @@ export interface MetricThreshold {
 
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
 export type LinkMode = "direct" | "browser" | "yazi";
-export type StockLink = "monex" | "shikiho" | "yazi";
+export type StockLink = "monex" | "shikiho" | "buffett_code" | "yazi";
 
 export interface RenderContext {
   githubPages: boolean;
@@ -554,7 +554,9 @@ function _resolveStockLink(stockLink: StockLink, row: StockRow, context: RenderC
 
   const href: string = stockLink === "monex"
     ? _buildMonexUrl(code)
-    : _buildShikihoUrl(code);
+    : stockLink === "shikiho"
+      ? _buildShikihoUrl(code)
+      : _buildBuffettCodeUrl(code);
   if (context.githubPages) {
     return { href, linkMode: "direct" };
   }
@@ -571,6 +573,10 @@ function _buildMonexUrl(code: string): string {
 
 function _buildShikihoUrl(code: string): string {
   return "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(code) + "/shikiho";
+}
+
+function _buildBuffettCodeUrl(code: string): string {
+  return "https://www.buffett-code.com/company/" + encodeURIComponent(code) + "/";
 }
 
 function _renderMessageRow(message: string): void {
