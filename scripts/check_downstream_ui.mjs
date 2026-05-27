@@ -21,16 +21,28 @@ const DATA_FILES = [
 const DOWNSTREAMS = [
   {
     name: 'formula_screening',
-    headers: ['code', 'name', 'price', 'ncr', 'per_a'],
+    columnOrder: ['code', 'name', 'net_cash_ratio', 'price', 'per_actual'],
   },
   {
     name: 'invest_like_legends',
-    headers: ['code', 'name', 'price', 'amount', 'ratio'],
+    columnOrder: ['code', 'name', 'net_cash_ratio', 'price', 'amount_millions', 'ratio_percent'],
     bodyPattern: /億/,
+    tabKey: 'hikari_all',
   },
   {
     name: 'land_value_research',
-    headers: ['code', 'name', 'price', 'est_val', 'mcap', 'bv', 'gain'],
+    columnOrder: [
+      'code',
+      'name',
+      'net_cash_ratio',
+      'ratio',
+      'memo',
+      'price',
+      'estimated_value_oku',
+      'market_cap_oku',
+      'book_value_oku',
+      'unrealized_gain_oku',
+    ],
   },
 ];
 
@@ -231,20 +243,18 @@ async function verifyPage(browser, downstream, url) {
       { timeout: 180_000 },
     );
 
-    const headerText = await page.locator('thead').innerText({ timeout: 10_000 });
-    for (const header of downstream.headers) {
-      if (!headerText.includes(header)) {
-        throw new Error(`${downstream.name}: missing header ${header}; headers were: ${headerText}`);
-      }
-    }
+    const headerKeys = await page.locator('thead th').evaluateAll((headers) => headers.map((header) => (
+      header.getAttribute('data-column-key') || ''
+    )));
+    assertColumnOrder(downstream.name, headerKeys, downstream.columnOrder);
 
     const statusText = await page.locator('#statusMessage').innerText({ timeout: 10_000 });
     if (!/株価基準日: \d{4}-\d{2}-\d{2}/.test(statusText)) {
       throw new Error(`${downstream.name}: missing stock price date in status; status was: ${statusText}`);
     }
 
-    if (downstream.name === 'invest_like_legends') {
-      await page.locator('[data-tab-key="hikari"]').click({ timeout: 10_000 });
+    if (downstream.tabKey) {
+      await page.locator(`[data-tab-key="${downstream.tabKey}"]`).click({ timeout: 10_000 });
       await page.waitForFunction(
         () => (document.querySelector('#tbody')?.textContent || '').includes('億'),
         { timeout: 30_000 },
@@ -260,6 +270,20 @@ async function verifyPage(browser, downstream, url) {
     }
   } finally {
     await page.close();
+  }
+}
+
+function assertColumnOrder(name, actual, expected) {
+  let previousIndex = -1;
+  for (const key of expected) {
+    const index = actual.indexOf(key);
+    if (index === -1) {
+      throw new Error(`${name}: missing column ${key}; columns were: ${actual.join(', ')}`);
+    }
+    if (index <= previousIndex) {
+      throw new Error(`${name}: column ${key} is out of order; columns were: ${actual.join(', ')}`);
+    }
+    previousIndex = index;
   }
 }
 
