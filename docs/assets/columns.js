@@ -18,6 +18,7 @@ export const NCR_SPEC = {
     header: "ncr",
     title: "(流動資産 - 棚卸資産 + 有価証券 * 0.7 - 流動負債 - 固定負債) / 時価総額",
     decimals: 2,
+    stockLink: "shikiho",
 };
 export const PER_A_SPEC = {
     key: "per_actual",
@@ -79,6 +80,7 @@ export function buildMetricCol(spec, accessor) {
         type: "num",
         title: spec.title,
         toggleable: true,
+        stockLink: spec.stockLink,
         render: (row) => {
             const value = scaleValue(accessor(row), spec);
             return value !== null ? value.toFixed(spec.decimals) + (spec.suffix ?? "") : "-";
@@ -93,6 +95,7 @@ function buildPegCol(spec, accessor, statusAccessor) {
         type: "num",
         title: `${spec.title} (${PEG_STATUS_LEGEND})`,
         toggleable: true,
+        stockLink: spec.stockLink,
         render: (row) => {
             const value = scaleValue(accessor(row), spec);
             if (value !== null) {
@@ -131,7 +134,6 @@ export const priceCol = {
     type: "num",
     title: "株価（終値）",
     toggleable: true,
-    stockLink: "shikiho",
     render: (row) => {
         const value = toNumber(row.price);
         return value !== null

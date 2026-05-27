@@ -5,7 +5,7 @@
  * pass the result to StockTable.init().
  */
 
-import type { ColumnDef, MetricThreshold } from "./stock-table";
+import type { ColumnDef, MetricThreshold, StockLink } from "./stock-table";
 
 export interface MetricColSpec {
   key: string;
@@ -14,6 +14,7 @@ export interface MetricColSpec {
   decimals: number;
   scale?: number;
   suffix?: string;
+  stockLink?: StockLink;
 }
 
 type Row = Record<string, unknown>;
@@ -35,6 +36,7 @@ export const NCR_SPEC: MetricColSpec = {
   header: "ncr",
   title: "(流動資産 - 棚卸資産 + 有価証券 * 0.7 - 流動負債 - 固定負債) / 時価総額",
   decimals: 2,
+  stockLink: "shikiho",
 };
 
 export const PER_A_SPEC: MetricColSpec = {
@@ -105,6 +107,7 @@ export function buildMetricCol(spec: MetricColSpec, accessor: MetricAccessor): C
     type: "num",
     title: spec.title,
     toggleable: true,
+    stockLink: spec.stockLink,
     render: (row: Row): string => {
       const value = scaleValue(accessor(row), spec);
       return value !== null ? value.toFixed(spec.decimals) + (spec.suffix ?? "") : "-";
@@ -124,6 +127,7 @@ function buildPegCol(
     type: "num",
     title: `${spec.title} (${PEG_STATUS_LEGEND})`,
     toggleable: true,
+    stockLink: spec.stockLink,
     render: (row: Row): string => {
       const value = scaleValue(accessor(row), spec);
       if (value !== null) {
@@ -166,7 +170,6 @@ export const priceCol: ColumnDef = {
   type: "num",
   title: "株価（終値）",
   toggleable: true,
-  stockLink: "shikiho",
   render: (row: Row): string => {
     const value = toNumber(row.price);
     return value !== null

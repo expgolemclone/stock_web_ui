@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import shutil
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 
@@ -108,11 +110,30 @@ def _serve_invest_like_legends(port: int) -> None:
 
 
 def _serve_land_value_research(project_dir: Path, port: int) -> None:
+    _ensure_land_value_screening_config_importable()
+
     from src.web import serve_ranking
 
     sample_dir = tempfile.TemporaryDirectory(prefix="stock-web-ui-land-output-")
     _copy_sample_outputs(project_dir / "data" / "output", Path(sample_dir.name))
     serve_ranking(input_dir=Path(sample_dir.name), server_config=_server_config(port))
+
+
+def _ensure_land_value_screening_config_importable() -> None:
+    try:
+        importlib.import_module("src.screening_config")
+        return
+    except ModuleNotFoundError as exc:
+        if exc.name != "src.screening_config":
+            raise
+
+    stub = types.ModuleType("src.screening_config")
+
+    def load_screening_config(_path: object) -> object:
+        raise RuntimeError("screening_config is unavailable in the downstream UI smoke test")
+
+    stub.load_screening_config = load_screening_config  # type: ignore[attr-defined]
+    sys.modules["src.screening_config"] = stub
 
 
 def _copy_sample_outputs(source_dir: Path, target_dir: Path, limit: int = 8) -> None:

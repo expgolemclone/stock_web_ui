@@ -4,7 +4,7 @@
  * Consumers combine these canonical columns with their own row accessors and
  * pass the result to StockTable.init().
  */
-import type { ColumnDef, MetricThreshold } from "./stock-table";
+import type { ColumnDef, MetricThreshold, StockLink } from "./stock-table";
 export interface MetricColSpec {
     key: string;
     header: string;
@@ -12,6 +12,7 @@ export interface MetricColSpec {
     decimals: number;
     scale?: number;
     suffix?: string;
+    stockLink?: StockLink;
 }
 type Row = Record<string, unknown>;
 type MetricAccessor = (row: Row) => number | null;

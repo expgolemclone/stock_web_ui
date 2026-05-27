@@ -12,7 +12,21 @@ const ASC_ARROW = "\u25B2";
 const DESC_ARROW = "\u25BC";
 const INACTIVE_ARROW = "\u25BD";
 const HIDDEN_COLUMNS_KEY = "hiddenColumns";
-const STICKY_COLUMN_KEYS = ["code", "name"];
+const STICKY_COLUMN_KEYS = ["code", "name", "net_cash_ratio"];
+const STICKY_COLUMN_CLASS_BY_KEY = {
+    code: "sticky-code",
+    name: "sticky-name",
+    net_cash_ratio: "sticky-net-cash-ratio",
+};
+const STICKY_LEFT_CLASS_BY_PREVIOUS_KEYS = {
+    "": "sticky-left-0",
+    code: "sticky-left-code",
+    name: "sticky-left-name",
+    net_cash_ratio: "sticky-left-net-cash-ratio",
+    "code|name": "sticky-left-code-name",
+    "code|net_cash_ratio": "sticky-left-code-net-cash-ratio",
+    "name|net_cash_ratio": "sticky-left-name-net-cash-ratio",
+};
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
 /* ------------------------------------------------------------------ */
@@ -579,14 +593,21 @@ function _getStickyColumnPlacement(col) {
     if (index < 0) {
         return null;
     }
-    const firstKey = stickyColumns[0]?.key || "";
     return {
-        keyClass: col.key === "code" ? "sticky-code" : "sticky-name",
-        leftClass: index === 0 ? "sticky-left-0" : "sticky-left-" + firstKey,
+        keyClass: STICKY_COLUMN_CLASS_BY_KEY[col.key],
+        leftClass: _getStickyLeftClass(stickyColumns, index),
     };
 }
 function _isStickyColumnKey(key) {
     return STICKY_COLUMN_KEYS.includes(key);
+}
+function _getStickyLeftClass(stickyColumns, index) {
+    const previousKeys = stickyColumns.slice(0, index).map(function (col) {
+        return col.key;
+    }).sort(function (a, b) {
+        return STICKY_COLUMN_KEYS.indexOf(a) - STICKY_COLUMN_KEYS.indexOf(b);
+    });
+    return STICKY_LEFT_CLASS_BY_PREVIOUS_KEYS[previousKeys.join("|")] || "sticky-left-0";
 }
 function _resetSortToDefault() {
     if (!_config) {

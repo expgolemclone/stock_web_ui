@@ -260,6 +260,42 @@ test('code と name は横スクロール時の固定列クラスを持つ', asy
   }));
 });
 
+test('net_cash_ratio は code と name の右に固定され四季報リンクを持つ', async function (t) {
+  const columns = createColumns();
+  columns.splice(2, 0, {
+    key: 'net_cash_ratio',
+    header: 'ncr',
+    type: 'num',
+    render: (row) => String(row.net_cash_ratio ?? '-'),
+    sortValue: (row) => toNumber(row.net_cash_ratio),
+    stockLink: 'shikiho',
+  });
+  const page = await setupTable({
+    rows: [
+      { code: '7203', name: 'Toyota', net_cash_ratio: 1.23, per: 15, pbr: 1.2 },
+      { code: '6501', name: 'Hitachi', net_cash_ratio: 0.91, per: 8, pbr: 1.4 },
+    ],
+    columns,
+  });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.ok(getHeaderCell(page.document, 'net_cash_ratio').classList.contains('sticky-col'));
+  assert.ok(getHeaderCell(page.document, 'net_cash_ratio').classList.contains('sticky-net-cash-ratio'));
+  assert.ok(getHeaderCell(page.document, 'net_cash_ratio').classList.contains('sticky-left-code-name'));
+  assert.ok(getColumnCells(page.document, 'net_cash_ratio').every(function (cell) {
+    return cell.classList.contains('sticky-col')
+      && cell.classList.contains('sticky-net-cash-ratio')
+      && cell.classList.contains('sticky-left-code-name');
+  }));
+
+  const anchor = getFirstCellAnchor(page.document, 'net_cash_ratio');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://shikiho.toyokeizai.net/stocks/7203/shikiho');
+  assert.equal(anchor.getAttribute('data-browser'), 'shikiho');
+});
+
 test('name だけの表では name を左端固定にする', async function (t) {
   const page = await setupTable({
     rows: [{ name: 'Shareholder A' }, { name: 'Shareholder B' }],

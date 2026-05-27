@@ -20,6 +20,7 @@
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
   --sticky-code-width: 86px;
   --sticky-name-width: 240px;
+  --sticky-net-cash-ratio-width: 92px;
   --table-row-bg: rgba(22, 33, 62, 0.88);
   --table-row-even-bg: rgba(30, 42, 74, 0.9);
 }
@@ -194,6 +195,12 @@ thead th.sticky-col {
   max-width: var(--sticky-name-width);
 }
 
+.sticky-net-cash-ratio {
+  width: var(--sticky-net-cash-ratio-width);
+  min-width: var(--sticky-net-cash-ratio-width);
+  max-width: var(--sticky-net-cash-ratio-width);
+}
+
 .sticky-left-0 {
   left: 0;
 }
@@ -204,6 +211,22 @@ thead th.sticky-col {
 
 .sticky-left-name {
   left: var(--sticky-name-width);
+}
+
+.sticky-left-net-cash-ratio {
+  left: var(--sticky-net-cash-ratio-width);
+}
+
+.sticky-left-code-name {
+  left: calc(var(--sticky-code-width) + var(--sticky-name-width));
+}
+
+.sticky-left-code-net-cash-ratio {
+  left: calc(var(--sticky-code-width) + var(--sticky-net-cash-ratio-width));
+}
+
+.sticky-left-name-net-cash-ratio {
+  left: calc(var(--sticky-name-width) + var(--sticky-net-cash-ratio-width));
 }
 
 .sort-button {
@@ -533,6 +556,7 @@ a.monex:hover {
   :root {
     --sticky-code-width: 74px;
     --sticky-name-width: 180px;
+    --sticky-net-cash-ratio-width: 78px;
   }
 
   td,
