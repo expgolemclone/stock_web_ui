@@ -52,12 +52,40 @@ test('canonical metric columns and thresholds match formula_screening values', a
       peg_trailing_5: null,
       peg_trailing_5_status: 'non_positive_growth',
     }),
-    'neg',
+    'growth-',
   );
   assert.equal(
     StockColumns.peg5y2fCol.render({
       peg_blended_5y_actual_2f: null,
       peg_blended_5y_actual_2f_status: 'missing_input',
+    }),
+    'miss',
+  );
+  assert.equal(
+    StockColumns.peg5yCol.render({
+      peg_trailing_5: null,
+      peg_trailing_5_status: 'insufficient_history',
+    }),
+    'hist',
+  );
+  assert.equal(
+    StockColumns.peg5yCol.render({
+      peg_trailing_5: null,
+      peg_trailing_5_status: 'non_positive_per',
+    }),
+    'per-',
+  );
+  assert.equal(
+    StockColumns.peg5yCol.render({
+      peg_trailing_5: null,
+      peg_trailing_5_status: 'non_positive_eps',
+    }),
+    'eps-',
+  );
+  assert.equal(
+    StockColumns.peg5yCol.render({
+      peg_trailing_5: null,
+      peg_trailing_5_status: 'unknown_status',
     }),
     '-',
   );

@@ -21,7 +21,14 @@ type MetricAccessor = (row: Row) => number | null;
 type StatusAccessor = (row: Row) => string | null;
 
 const PERCENT_SCALE = 100;
-const NON_POSITIVE_GROWTH_STATUS = "non_positive_growth";
+const PEG_STATUS_LABELS: Record<string, string> = {
+  missing_input: "miss",
+  insufficient_history: "hist",
+  non_positive_per: "per-",
+  non_positive_eps: "eps-",
+  non_positive_growth: "growth-",
+};
+const PEG_STATUS_LEGEND = "未算出: miss=入力欠損 / hist=履歴不足 / per-=PER<=0 / eps-=EPS<=0 / growth-=成長率<=0";
 
 export const NCR_SPEC: MetricColSpec = {
   key: "net_cash_ratio",
@@ -115,17 +122,24 @@ function buildPegCol(
     key: spec.key,
     header: spec.header,
     type: "num",
-    title: spec.title,
+    title: `${spec.title} (${PEG_STATUS_LEGEND})`,
     toggleable: true,
     render: (row: Row): string => {
       const value = scaleValue(accessor(row), spec);
       if (value !== null) {
         return value.toFixed(spec.decimals) + (spec.suffix ?? "");
       }
-      return statusAccessor(row) === NON_POSITIVE_GROWTH_STATUS ? "neg" : "-";
+      return renderPegStatus(statusAccessor(row));
     },
     sortValue: (row: Row): number | null => scaleValue(accessor(row), spec),
   };
+}
+
+function renderPegStatus(status: string | null): string {
+  if (status === null || status === "ok") {
+    return "-";
+  }
+  return PEG_STATUS_LABELS[status] ?? "-";
 }
 
 export const codeCol: ColumnDef = {
