@@ -43,13 +43,13 @@ function createColumns({ defaultColumnToggleable = false } = {}) {
   ];
 }
 
-function createConfig(columns, { githubPages = false, metadataUrl = undefined } = {}) {
+function createConfig(columns, { githubPages = false, metadataUrl = undefined, metricThresholds = {} } = {}) {
   return {
     defaultTitle: '銘柄一覧',
     dataUrl: '/api/stocks',
     metadataUrl,
     columns,
-    metricThresholds: {},
+    metricThresholds,
     defaultSortKey: 'code',
     defaultSortDirection: 'desc',
     githubPages,
@@ -87,6 +87,7 @@ async function setupTable({
   storedHiddenColumns = null,
   columns = createColumns(),
   githubPages = false,
+  metricThresholds = {},
 } = {}) {
   const dom = new JSDOM(
     `<!DOCTYPE html>
@@ -169,6 +170,7 @@ async function setupTable({
   StockTable.init(createConfig(columns, {
     githubPages,
     metadataUrl: metadata === null ? undefined : '/api/stock-price-meta',
+    metricThresholds,
   }));
   await flushAsync();
 
@@ -294,6 +296,38 @@ test('net_cash_ratio は code と name の右に固定され四季報リンク�
   assert.ok(anchor);
   assert.equal(anchor.getAttribute('href'), 'https://shikiho.toyokeizai.net/stocks/7203/shikiho');
   assert.equal(anchor.getAttribute('data-browser'), 'shikiho');
+});
+
+test('リンク付き指標セルは指標色クラスを維持する', async function (t) {
+  const columns = createColumns();
+  columns.splice(2, 0, {
+    key: 'net_cash_ratio',
+    header: 'ncr',
+    type: 'num',
+    render: (row) => String(row.net_cash_ratio ?? '-'),
+    sortValue: (row) => toNumber(row.net_cash_ratio),
+    stockLink: 'shikiho',
+  });
+  const page = await setupTable({
+    rows: [
+      { code: '7203', name: 'Toyota', net_cash_ratio: 1.23, per: 15, pbr: 1.2 },
+      { code: '6501', name: 'Hitachi', net_cash_ratio: 0.91, per: 8, pbr: 1.4 },
+    ],
+    columns,
+    metricThresholds: {
+      net_cash_ratio: { good: (value) => value > 1 },
+    },
+  });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const ncrCells = getColumnCells(page.document, 'net_cash_ratio');
+  const anchor = ncrCells[0].querySelector('a');
+  assert.ok(anchor);
+  assert.ok(ncrCells[0].classList.contains('metric-cell'));
+  assert.ok(ncrCells[0].classList.contains('metric-good'));
+  assert.equal(anchor.textContent.trim(), '1.23');
 });
 
 test('name だけの表では name を左端固定にする', async function (t) {

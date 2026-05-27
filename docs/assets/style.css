@@ -381,6 +381,10 @@ a.monex:hover {
   color: #6bb3ff;
 }
 
+.metric-cell > a {
+  color: inherit;
+}
+
 /* Detail modal */
 
 .detail-modal {

@@ -654,15 +654,15 @@ function _metricCls(col: ColumnDef, row: StockRow): string {
   }
   const raw: number | null | undefined = col.sortValue ? col.sortValue(row) : null;
   if (raw === null || raw === undefined) {
-    return "";
+    return " metric-cell";
   }
   if (t.good && t.good(raw)) {
-    return " metric-good";
+    return " metric-cell metric-good";
   }
   if (t.bad && t.bad(raw)) {
-    return " metric-bad";
+    return " metric-cell metric-bad";
   }
-  return "";
+  return " metric-cell";
 }
 
 /* ------------------------------------------------------------------ */
