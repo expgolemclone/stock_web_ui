@@ -47,6 +47,8 @@ export interface StockTableConfig {
 }
 export declare const StockTable: {
     init: typeof init;
+    getRowData: typeof getRowData;
 };
+declare function getRowData(code: string): Record<string, unknown> | null;
 declare function init(config: StockTableConfig): void;
 export {};

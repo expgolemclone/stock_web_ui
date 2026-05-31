@@ -552,6 +552,25 @@ a.monex:hover {
   border: 0;
 }
 
+/* CF hover chart tooltip */
+
+.cf-tooltip {
+  position: fixed;
+  z-index: 50;
+  width: 580px;
+  background: #0d1117;
+  border: 1px solid #444c6a;
+  border-radius: 10px;
+  padding: 12px 14px 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+}
+
+.cf-tooltip canvas {
+  width: 100% !important;
+  height: 300px !important;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 16px 8px 28px;

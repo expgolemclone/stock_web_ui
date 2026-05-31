@@ -9,6 +9,7 @@ from stock_web_ui import INDEX_TEMPLATE_PATH
 
 _LOCAL_SHARED_ASSET_BASE_URL = "assets"
 _LOCAL_APP_ASSET_BASE_URL = "assets"
+_CHART_JS_CDN = "https://cdn.jsdelivr.net/npm/chart.js"
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +19,7 @@ class IndexPage:
     tab_aria_label: str = "タブ切替"
     asset_version: str = ""
     shared_asset_base_url: str = ""
+    chart_js_url: str = _CHART_JS_CDN
 
 
 def render_index_html(page: IndexPage) -> bytes:
@@ -27,6 +29,7 @@ def render_index_html(page: IndexPage) -> bytes:
     shared_style_url: str = _build_asset_url(shared_asset_base_url, "style.css", asset_version_suffix)
     shared_runtime_url: str = _build_asset_url(shared_asset_base_url, "stock-table.js", asset_version_suffix)
     shared_columns_url: str = _build_asset_url(shared_asset_base_url, "columns.js", asset_version_suffix)
+    shared_cf_chart_url: str = _build_asset_url(shared_asset_base_url, "cf-chart.js", asset_version_suffix)
     app_script_url: str = _build_asset_url(_LOCAL_APP_ASSET_BASE_URL, "app.js", asset_version_suffix)
     rendered: str = (
         template
@@ -36,6 +39,8 @@ def render_index_html(page: IndexPage) -> bytes:
         .replace("{{SHARED_STYLE_URL}}", escape(shared_style_url, quote=True))
         .replace("{{SHARED_RUNTIME_URL}}", escape(shared_runtime_url, quote=True))
         .replace("{{SHARED_COLUMNS_URL}}", escape(shared_columns_url, quote=True))
+        .replace("{{CHART_JS_URL}}", escape(page.chart_js_url, quote=True))
+        .replace("{{SHARED_CF_CHART_URL}}", escape(shared_cf_chart_url, quote=True))
         .replace("{{APP_SCRIPT_URL}}", escape(app_script_url, quote=True))
     )
     return rendered.encode("utf-8")

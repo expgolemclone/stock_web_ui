@@ -55,12 +55,18 @@ const _detailMap = {};
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
-export const StockTable = { init };
+export const StockTable = { init, getRowData };
 const _globalScope = globalThis;
 _globalScope.StockTable = StockTable;
 /* ------------------------------------------------------------------ */
 /*  Initialisation                                                     */
 /* ------------------------------------------------------------------ */
+function getRowData(code) {
+    if (!_state.rows) {
+        return null;
+    }
+    return _state.rows.find(function (r) { return r.code === code; }) ?? null;
+}
 function init(config) {
     _config = config;
     _state.rows = null;

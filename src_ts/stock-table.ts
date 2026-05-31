@@ -154,7 +154,7 @@ const _detailMap: Record<number, string> = {};
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-export const StockTable = { init };
+export const StockTable = { init, getRowData };
 
 const _globalScope = globalThis as typeof globalThis & { StockTable?: typeof StockTable };
 _globalScope.StockTable = StockTable;
@@ -162,6 +162,13 @@ _globalScope.StockTable = StockTable;
 /* ------------------------------------------------------------------ */
 /*  Initialisation                                                     */
 /* ------------------------------------------------------------------ */
+
+function getRowData(code: string): Record<string, unknown> | null {
+  if (!_state.rows) {
+    return null;
+  }
+  return _state.rows.find(function (r: StockRow): boolean { return r.code === code; }) ?? null;
+}
 
 function init(config: StockTableConfig): void {
   _config = config;
