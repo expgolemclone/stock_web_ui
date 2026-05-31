@@ -8,7 +8,7 @@ import type { ColumnDef, MetricThreshold, StockLink } from "./stock-table";
 export interface MetricColSpec {
     key: string;
     header: string;
-    title: string;
+    title?: string;
     decimals: number;
     scale?: number;
     suffix?: string;
@@ -21,6 +21,7 @@ export declare const PER_A_SPEC: MetricColSpec;
 export declare const PER_C_SPEC: MetricColSpec;
 export declare const PER_N_SPEC: MetricColSpec;
 export declare const EQUITY_SPEC: MetricColSpec;
+export declare const METRIC_TITLES: Record<string, string>;
 export declare function buildMetricCol(spec: MetricColSpec, accessor: MetricAccessor): ColumnDef;
 export declare const codeCol: ColumnDef;
 export declare const nameCol: ColumnDef;
@@ -45,5 +46,6 @@ export declare const StockColumns: {
     PER_N_SPEC: MetricColSpec;
     EQUITY_SPEC: MetricColSpec;
     COMMON_THRESHOLDS: Record<string, MetricThreshold>;
+    METRIC_TITLES: Record<string, string>;
 };
 export {};
