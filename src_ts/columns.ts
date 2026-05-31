@@ -69,6 +69,7 @@ const FCF_YIELD_SPEC: MetricColSpec = {
   decimals: 2,
   scale: PERCENT_SCALE,
   suffix: "%",
+  stockLink: "buffett_code",
 };
 
 const PEG_5Y_SPEC: MetricColSpec = {
@@ -177,7 +178,6 @@ export const priceCol: ColumnDef = {
   type: "num",
   title: "株価（終値）",
   toggleable: true,
-  stockLink: "buffett_code",
   render: (row: Row): string => {
     const value = toNumber(row.price);
     return value !== null
