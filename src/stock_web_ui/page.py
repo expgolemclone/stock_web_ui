@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from html import escape
 
-from stock_web_ui import INDEX_TEMPLATE_PATH
+from stock_web_ui import ASSETS_DIR, INDEX_TEMPLATE_PATH
 
 _LOCAL_SHARED_ASSET_BASE_URL = "assets"
 _LOCAL_APP_ASSET_BASE_URL = "assets"
@@ -24,7 +25,8 @@ class IndexPage:
 
 def render_index_html(page: IndexPage) -> bytes:
     template: str = INDEX_TEMPLATE_PATH.read_text(encoding="utf-8")
-    asset_version_suffix: str = f"?v={escape(page.asset_version, quote=True)}" if page.asset_version else ""
+    version: str = page.asset_version or _compute_asset_hash()
+    asset_version_suffix: str = f"?v={escape(version, quote=True)}"
     shared_asset_base_url: str = _resolve_shared_asset_base_url(page.shared_asset_base_url)
     shared_style_url: str = _build_asset_url(shared_asset_base_url, "style.css", asset_version_suffix)
     shared_runtime_url: str = _build_asset_url(shared_asset_base_url, "stock-table.js", asset_version_suffix)
@@ -55,3 +57,20 @@ def _resolve_shared_asset_base_url(shared_asset_base_url: str) -> str:
 
 def _build_asset_url(base_url: str, filename: str, suffix: str) -> str:
     return f"{base_url}/{filename}{suffix}"
+
+
+_ASSET_FILES = ("style.css", "stock-table.js", "columns.js", "cf-chart.js")
+_cached_hash: str | None = None
+
+
+def _compute_asset_hash() -> str:
+    global _cached_hash
+    if _cached_hash is not None:
+        return _cached_hash
+    h = hashlib.md5()
+    for name in _ASSET_FILES:
+        path = ASSETS_DIR / name
+        if path.is_file():
+            h.update(path.read_bytes())
+    _cached_hash = h.hexdigest()[:10]
+    return _cached_hash
