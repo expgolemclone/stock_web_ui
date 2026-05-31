@@ -49,6 +49,8 @@ const DOWNSTREAMS = [
 const SURFACE_PATHS = [
   '.githooks',
   '.claude/hooks',
+  'docs/assets/cf-chart.js',
+  'docs/assets/cf-chart.d.ts',
   'docs/assets/columns.js',
   'docs/assets/columns.d.ts',
   'docs/assets/stock-table.js',
