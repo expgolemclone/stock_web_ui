@@ -64,6 +64,11 @@ impl IndexPage {
                 "{{SHARED_COLUMNS_URL}}",
                 &format!("{shared_base}/columns.js{asset_version_suffix}"),
             )
+            .replace("{{CHART_JS_URL}}", "https://cdn.jsdelivr.net/npm/chart.js")
+            .replace(
+                "{{SHARED_CF_CHART_URL}}",
+                &format!("{shared_base}/cf-chart.js{asset_version_suffix}"),
+            )
             .replace(
                 "{{APP_SCRIPT_URL}}",
                 &format!("assets/app.js{asset_version_suffix}"),
@@ -88,7 +93,11 @@ pub struct ServeConfig {
 pub fn serve(config: ServeConfig) -> Result<(), String> {
     let template =
         fs::read_to_string(&config.index_template_path).map_err(|err| err.to_string())?;
-    let index_html = config.index_page.render(&template);
+    let mut index_page = config.index_page;
+    if index_page.asset_version.is_empty() {
+        index_page.asset_version = compute_asset_hash(&config.shared_assets_root);
+    }
+    let index_html = index_page.render(&template);
     let address = format!("{}:{}", config.server.host, config.server.port);
     release_port_if_needed(&config.server.host, config.server.port)?;
     let server = Server::http(&address).map_err(|err| err.to_string())?;
@@ -532,4 +541,18 @@ fn escape_html(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#x27;")
+}
+
+const ASSET_FILES: &[&str] = &["style.css", "stock-table.js", "columns.js", "cf-chart.js"];
+
+fn compute_asset_hash(root: &Path) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for name in ASSET_FILES {
+        let path = root.join(name);
+        if let Ok(data) = fs::read(&path) {
+            data.hash(&mut hasher);
+        }
+    }
+    format!("{:010x}", hasher.finish())
 }
