@@ -556,3 +556,52 @@ fn compute_asset_hash(root: &Path) -> String {
     }
     format!("{:010x}", hasher.finish())
 }
+
+/* ------------------------------------------------------------------ */
+/*  pyo3 bindings (feature = "python")                                 */
+/* ------------------------------------------------------------------ */
+
+#[cfg(feature = "python")]
+mod python {
+    use super::{compute_asset_hash, IndexPage};
+    use pyo3::prelude::*;
+    use std::path::Path;
+
+    #[pyfunction]
+    #[pyo3(signature = (template, title, loading_message, tab_aria_label, asset_version="", shared_asset_base_url="", shared_assets_root=""))]
+    fn render_index_html(
+        template: &str,
+        title: &str,
+        loading_message: &str,
+        tab_aria_label: &str,
+        asset_version: &str,
+        shared_asset_base_url: &str,
+        shared_assets_root: &str,
+    ) -> PyResult<Vec<u8>> {
+        let version = if asset_version.is_empty() && !shared_assets_root.is_empty() {
+            compute_asset_hash(Path::new(shared_assets_root))
+        } else {
+            asset_version.to_string()
+        };
+        let page = IndexPage {
+            title: title.to_string(),
+            loading_message: loading_message.to_string(),
+            tab_aria_label: tab_aria_label.to_string(),
+            asset_version: version,
+            shared_asset_base_url: shared_asset_base_url.to_string(),
+        };
+        Ok(page.render(template))
+    }
+
+    #[pyfunction]
+    fn compute_asset_hash_py(shared_assets_root: &str) -> String {
+        compute_asset_hash(Path::new(shared_assets_root))
+    }
+
+    #[pymodule]
+    fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        m.add_function(wrap_pyfunction!(render_index_html, m)?)?;
+        m.add_function(wrap_pyfunction!(compute_asset_hash_py, m)?)?;
+        Ok(())
+    }
+}
