@@ -124,6 +124,25 @@ body {
   color: var(--accent);
 }
 
+.export-csv-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+}
+
+.export-csv-btn:hover {
+  border-color: #4caf50;
+  color: #81c784;
+  background: rgba(76, 175, 80, 0.12);
+}
+
 .hidden-col {
   display: none;
 }

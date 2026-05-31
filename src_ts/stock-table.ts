@@ -82,6 +82,7 @@ interface Elements {
   thead: HTMLTableSectionElement | null;
   tbody: HTMLElement | null;
   toggleBar: HTMLElement | null;
+  exportBtn: HTMLButtonElement | null;
 }
 
 interface ResolvedLink {
@@ -143,6 +144,7 @@ const _el: Elements = {
   thead: null,
   tbody: null,
   toggleBar: null,
+  exportBtn: null,
 };
 
 let _detailIndex: number = 0;
@@ -179,6 +181,7 @@ function init(config: StockTableConfig): void {
   _el.thead = document.querySelector("#stockTable > thead");
   _el.tbody = document.getElementById("tbody");
   _el.toggleBar = document.getElementById("toggleBar");
+  _el.exportBtn = _createExportButton();
 
   if (config.detailModal) {
     _createModal();
@@ -333,6 +336,7 @@ function _render(): void {
     document.title = _config ? _config.defaultTitle : "";
     _el.status!.textContent = "データを読み込み中です。";
     _renderMessageRow("データを読み込み中です。");
+    _updateExportButton();
     return;
   }
 
@@ -340,6 +344,7 @@ function _render(): void {
     document.title = _config ? _config.defaultTitle : "";
     _el.status!.textContent = _state.error;
     _renderMessageRow(_state.error);
+    _updateExportButton();
     return;
   }
 
@@ -347,6 +352,7 @@ function _render(): void {
   const tabName: string = _getActiveTabName();
   document.title = tabName ? tabName + " - " + _config!.defaultTitle : _config!.defaultTitle;
   _el.status!.textContent = _formatStatus(visible.length);
+  _updateExportButton();
 
   if (visible.length === 0) {
     _renderMessageRow("該当する銘柄はありません。");
@@ -837,6 +843,13 @@ function _bindEvents(): void {
     _render();
   });
 
+  /* export csv */
+  if (_el.exportBtn) {
+    _el.exportBtn.addEventListener("click", function (): void {
+      _exportCsv();
+    });
+  }
+
   /* toggle chips */
   if (_el.toggleBar) {
     _el.toggleBar.addEventListener("click", function (e: MouseEvent): void {
@@ -1021,4 +1034,95 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+/* ------------------------------------------------------------------ */
+/*  CSV Export                                                          */
+/* ------------------------------------------------------------------ */
+
+function _createExportButton(): HTMLButtonElement | null {
+  const toolbar: HTMLElement | null = _el.toggleBar?.parentElement ?? null;
+  if (!toolbar) {
+    return null;
+  }
+  const btn: HTMLButtonElement = document.createElement("button");
+  btn.type = "button";
+  btn.className = "export-csv-btn";
+  btn.textContent = "CSV";
+  btn.style.display = "none";
+  toolbar.appendChild(btn);
+  return btn;
+}
+
+function _updateExportButton(): void {
+  if (!_el.exportBtn) {
+    return;
+  }
+  const visible: StockRow[] = _getVisibleRows();
+  _el.exportBtn.style.display = visible.length > 0 ? "" : "none";
+}
+
+function _exportCsv(): void {
+  if (!_config || !_state.rows) {
+    return;
+  }
+
+  const visible: StockRow[] = _getVisibleRows();
+  if (visible.length === 0) {
+    return;
+  }
+
+  const visibleCols: ColumnDef[] = _config.columns.filter(
+    (col: ColumnDef): boolean => !_isColumnHidden(col.key),
+  );
+
+  const header: string = visibleCols
+    .map((col: ColumnDef): string => _csvEscape(col.header))
+    .join(",");
+
+  const rows: string[] = visible.map((row: StockRow): string => {
+    return visibleCols
+      .map((col: ColumnDef): string => _csvEscape(_stripHtml(col.render(row))))
+      .join(",");
+  });
+
+  const csv: string = "\uFEFF" + header + "\n" + rows.join("\n");
+
+  const blob: Blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url: string = URL.createObjectURL(blob);
+  const now: Date = new Date();
+  const ts: string = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    "_",
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("");
+  const filename: string = _config.defaultTitle.replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+/g, "_") + "_" + ts + ".csv";
+
+  const anchor: HTMLAnchorElement = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function _stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&nbsp;", " ");
+}
+
+function _csvEscape(value: string): string {
+  if (value.includes('"') || value.includes(",") || value.includes("\n") || value.includes("\r")) {
+    return '"' + value.replaceAll('"', '""') + '"';
+  }
+  return value;
 }
