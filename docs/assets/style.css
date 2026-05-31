@@ -557,7 +557,7 @@ a.monex:hover {
 .cf-tooltip {
   position: fixed;
   z-index: 50;
-  width: 580px;
+  width: min(760px, 90vw);
   background: #0d1117;
   border: 1px solid #444c6a;
   border-radius: 10px;
@@ -568,7 +568,7 @@ a.monex:hover {
 
 .cf-tooltip canvas {
   width: 100% !important;
-  height: 300px !important;
+  height: min(400px, 45vh) !important;
 }
 
 @media (max-width: 768px) {

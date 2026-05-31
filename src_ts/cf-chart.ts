@@ -170,7 +170,8 @@ function _positionTooltip(cell: HTMLTableCellElement): void {
   }
 
   const rect = cell.getBoundingClientRect();
-  const tooltipWidth = 580;
+  const tooltipWidth = _tooltip.offsetWidth;
+  const tooltipHeight = _tooltip.offsetHeight;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
@@ -183,8 +184,8 @@ function _positionTooltip(cell: HTMLTableCellElement): void {
   }
 
   let top = rect.bottom + 8;
-  if (top + 350 > viewportHeight) {
-    top = rect.top - 350 - 8;
+  if (top + tooltipHeight > viewportHeight) {
+    top = rect.top - tooltipHeight - 8;
   }
   if (top < 12) {
     top = 12;
