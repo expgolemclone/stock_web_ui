@@ -154,18 +154,18 @@ function _createChart(cfHistory) {
     }
     const canvas = _tooltip.querySelector("canvas");
     const sorted = cfHistory.slice().sort(function (a, b) {
-        return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+        return a.period < b.period ? -1 : a.period > b.period ? 1 : 0;
     });
     const labels = sorted.map(function (entry) {
-        return _formatPeriod(entry[0]);
+        return _formatPeriod(entry.period);
     });
     const operatingData = sorted.map(_extractField("operating_cf"));
     const investingData = sorted.map(_extractField("investing_cf"));
     const financingData = sorted.map(_extractField("financing_cf"));
     const cashData = sorted.map(_extractField("cash_equivalents"));
     const freeCfData = sorted.map(function (entry) {
-        const op = entry[1].operating_cf;
-        const inv = entry[1].investing_cf;
+        const op = entry.items.operating_cf;
+        const inv = entry.items.investing_cf;
         if (op !== null && inv !== null) {
             return (op + inv) / MILLION;
         }
@@ -291,7 +291,7 @@ function _createChart(cfHistory) {
 /* ------------------------------------------------------------------ */
 function _extractField(field) {
     return function (entry) {
-        const v = entry[1][field];
+        const v = entry.items[field];
         return v !== null ? v / MILLION : null;
     };
 }
