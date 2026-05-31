@@ -12,11 +12,11 @@ const SHOW_DELAY_MS = 300;
 const HIDE_DELAY_MS = 200;
 const MILLION = 1_000_000;
 const CF_COLORS = {
-    operating_cf: "#d4a574",
-    investing_cf: "#4caf50",
-    financing_cf: "#ab47bc",
-    cash_equivalents: "#42a5f5",
-    free_cf: "#ef5350",
+    operating_cf: "#e8a87c",
+    investing_cf: "#41b3a3",
+    financing_cf: "#c38d9e",
+    cash_equivalents: "#85cdca",
+    free_cf: "#f64c72",
 };
 const CF_LABELS = {
     operating_cf: "営業CF",
@@ -25,8 +25,8 @@ const CF_LABELS = {
     cash_equivalents: "現金等価物",
     free_cf: "フリーCF",
 };
-const CHART_FONT_COLOR = "#c9d1d9";
-const GRID_COLOR = "rgba(255,255,255,0.08)";
+const CHART_FONT_COLOR = "#b8c0cc";
+const GRID_COLOR = "rgba(255,255,255,0.04)";
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
 /* ------------------------------------------------------------------ */
@@ -113,6 +113,9 @@ function _ensureTooltip() {
     _tooltip = document.createElement("div");
     _tooltip.className = "cf-tooltip";
     const canvas = document.createElement("canvas");
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 760 * dpr;
+    canvas.height = 400 * dpr;
     _tooltip.appendChild(canvas);
     _tooltip.addEventListener("mouseenter", function () {
         _cancelHide();
@@ -185,36 +188,48 @@ function _createChart(cfHistory) {
                     label: CF_LABELS.operating_cf,
                     type: "bar",
                     data: operatingData,
-                    backgroundColor: CF_COLORS.operating_cf + "cc",
+                    backgroundColor: CF_COLORS.operating_cf + "b3",
                     borderColor: CF_COLORS.operating_cf,
                     borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
                     order: 2,
                 },
                 {
                     label: CF_LABELS.investing_cf,
                     type: "bar",
                     data: investingData,
-                    backgroundColor: CF_COLORS.investing_cf + "cc",
+                    backgroundColor: CF_COLORS.investing_cf + "b3",
                     borderColor: CF_COLORS.investing_cf,
                     borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
                     order: 3,
                 },
                 {
                     label: CF_LABELS.financing_cf,
                     type: "bar",
                     data: financingData,
-                    backgroundColor: CF_COLORS.financing_cf + "cc",
+                    backgroundColor: CF_COLORS.financing_cf + "b3",
                     borderColor: CF_COLORS.financing_cf,
                     borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
                     order: 4,
                 },
                 {
                     label: CF_LABELS.cash_equivalents,
                     type: "bar",
                     data: cashData,
-                    backgroundColor: CF_COLORS.cash_equivalents + "cc",
+                    backgroundColor: CF_COLORS.cash_equivalents + "b3",
                     borderColor: CF_COLORS.cash_equivalents,
                     borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
                     order: 5,
                 },
                 {
@@ -222,11 +237,13 @@ function _createChart(cfHistory) {
                     type: "line",
                     data: freeCfData,
                     borderColor: CF_COLORS.free_cf,
-                    backgroundColor: CF_COLORS.free_cf + "33",
-                    borderWidth: 2.5,
-                    pointRadius: 3,
+                    backgroundColor: CF_COLORS.free_cf + "28",
+                    borderWidth: 3,
+                    pointRadius: 4,
                     pointBackgroundColor: CF_COLORS.free_cf,
-                    tension: 0.2,
+                    pointBorderColor: "#0d1117",
+                    pointBorderWidth: 1.5,
+                    tension: 0.3,
                     fill: false,
                     order: 1,
                 },
@@ -235,7 +252,7 @@ function _createChart(cfHistory) {
         options: {
             responsive: false,
             maintainAspectRatio: false,
-            animation: { duration: 200 },
+            animation: { duration: 300, easing: "easeOutQuart" },
             interaction: {
                 mode: "index",
                 intersect: false,
@@ -243,20 +260,23 @@ function _createChart(cfHistory) {
             plugins: {
                 legend: {
                     display: true,
-                    position: "top",
+                    position: "bottom",
                     labels: {
                         color: CHART_FONT_COLOR,
-                        font: { size: 11 },
-                        boxWidth: 12,
-                        padding: 10,
+                        font: { size: 12, weight: "500" },
+                        boxWidth: 14,
+                        padding: 14,
                     },
                 },
                 tooltip: {
                     backgroundColor: "rgba(13,17,23,0.95)",
                     titleColor: "#e0e0e0",
                     bodyColor: CHART_FONT_COLOR,
-                    borderColor: "#444c6a",
+                    borderColor: "rgba(255,255,255,0.08)",
                     borderWidth: 1,
+                    cornerRadius: 8,
+                    padding: 10,
+                    titleFont: { weight: "600" },
                     callbacks: {
                         label: function (ctx) {
                             const value = ctx.parsed.y;
@@ -270,18 +290,20 @@ function _createChart(cfHistory) {
             },
             scales: {
                 x: {
-                    ticks: { color: CHART_FONT_COLOR, font: { size: 11 } },
-                    grid: { color: GRID_COLOR },
+                    ticks: { color: CHART_FONT_COLOR, font: { size: 13, weight: "500" } },
+                    grid: { display: false },
+                    border: { color: "rgba(255,255,255,0.06)" },
                 },
                 y: {
                     ticks: {
                         color: CHART_FONT_COLOR,
-                        font: { size: 11 },
+                        font: { size: 13, weight: "500" },
                         callback: function (value) {
                             return Number(value).toLocaleString("ja-JP", { maximumFractionDigits: 0 });
                         },
                     },
                     grid: { color: GRID_COLOR },
+                    border: { display: false },
                 },
             },
         },
