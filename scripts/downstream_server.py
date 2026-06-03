@@ -104,7 +104,11 @@ def _serve_invest_like_legends(port: int) -> None:
             tab_aria_label="投資家切替",
         ),
         server_config=_server_config(port),
-        api_routes=app_serve._create_api_routes(),
+        api_routes=app_serve._create_api_routes(
+            investors_doc=investors_doc,
+            shareholder_candidates_doc=candidates_doc,
+            stock_price_metadata=metadata,
+        ),
         yazi_base_dir=app_serve._HANDBOOK_DATA_DIR,
     )
 

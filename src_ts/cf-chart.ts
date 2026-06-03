@@ -12,7 +12,7 @@
 
 type CfHistoryEntry = {
   period: string;
-  items: Record<string, number | null>;
+  items: Record<string, number | null | undefined>;
 };
 
 interface StockTableRef {
@@ -25,6 +25,8 @@ interface StockTableRef {
 
 const SHOW_DELAY_MS = 300;
 const HIDE_DELAY_MS = 200;
+const CHART_WIDTH = 760;
+const CHART_HEIGHT = 400;
 const MILLION = 1_000_000;
 
 const CF_COLORS = {
@@ -152,9 +154,8 @@ function _ensureTooltip(): void {
   _tooltip.className = "cf-tooltip";
 
   const canvas = document.createElement("canvas");
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = 760 * dpr;
-  canvas.height = 400 * dpr;
+  canvas.width = CHART_WIDTH;
+  canvas.height = CHART_HEIGHT;
   _tooltip.appendChild(canvas);
 
   _tooltip.addEventListener("mouseenter", function (): void {
@@ -223,14 +224,7 @@ function _createChart(cfHistory: CfHistoryEntry[]): void {
   const investingData = sorted.map(_extractField("investing_cf"));
   const financingData = sorted.map(_extractField("financing_cf"));
   const cashData = sorted.map(_extractField("cash_equivalents"));
-  const freeCfData = sorted.map(function (entry: CfHistoryEntry): number | null {
-    const op = entry.items.operating_cf;
-    const inv = entry.items.investing_cf;
-    if (op !== null && inv !== null) {
-      return (op + inv) / MILLION;
-    }
-    return null;
-  });
+  const freeCfData = sorted.map(_extractFreeCf);
 
   const Chart = _getChartConstructor();
   if (!Chart) {
@@ -340,10 +334,10 @@ function _createChart(cfHistory: CfHistoryEntry[]): void {
           callbacks: {
             label: function (ctx: { dataset: { label?: string }; parsed: { y: number | null } }): string {
               const value = ctx.parsed.y;
-              if (value === null) {
+              if (typeof value !== "number" || !Number.isFinite(value)) {
                 return (ctx.dataset.label ?? "") + ": -";
               }
-              return (ctx.dataset.label ?? "") + ": " + value.toLocaleString("ja-JP", { maximumFractionDigits: 0 });
+              return (ctx.dataset.label ?? "") + ": " + _formatChartValue(value);
             },
           },
         },
@@ -376,9 +370,35 @@ function _createChart(cfHistory: CfHistoryEntry[]): void {
 
 function _extractField(field: string): (entry: CfHistoryEntry) => number | null {
   return function (entry: CfHistoryEntry): number | null {
-    const v = entry.items[field];
-    return v !== null ? v / MILLION : null;
+    return _toMillions(_getFiniteNumber(entry.items, field));
   };
+}
+
+function _extractFreeCf(entry: CfHistoryEntry): number | null {
+  const explicitFreeCf = _getFiniteNumber(entry.items, "free_cf");
+  if (explicitFreeCf !== null) {
+    return _toMillions(explicitFreeCf);
+  }
+
+  const op = _getFiniteNumber(entry.items, "operating_cf");
+  const inv = _getFiniteNumber(entry.items, "investing_cf");
+  if (op !== null && inv !== null) {
+    return _toMillions(op + inv);
+  }
+  return null;
+}
+
+function _getFiniteNumber(items: CfHistoryEntry["items"], field: string): number | null {
+  const value = items[field];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function _toMillions(value: number | null): number | null {
+  return value === null ? null : value / MILLION;
+}
+
+function _formatChartValue(value: number): string {
+  return value.toLocaleString("ja-JP", { maximumFractionDigits: 1 }) + " 百万円";
 }
 
 function _formatPeriod(period: string): string {

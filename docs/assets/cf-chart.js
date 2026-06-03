@@ -10,6 +10,8 @@
 /* ------------------------------------------------------------------ */
 const SHOW_DELAY_MS = 300;
 const HIDE_DELAY_MS = 200;
+const CHART_WIDTH = 760;
+const CHART_HEIGHT = 400;
 const MILLION = 1_000_000;
 const CF_COLORS = {
     operating_cf: "#e8a87c",
@@ -113,9 +115,8 @@ function _ensureTooltip() {
     _tooltip = document.createElement("div");
     _tooltip.className = "cf-tooltip";
     const canvas = document.createElement("canvas");
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = 760 * dpr;
-    canvas.height = 400 * dpr;
+    canvas.width = CHART_WIDTH;
+    canvas.height = CHART_HEIGHT;
     _tooltip.appendChild(canvas);
     _tooltip.addEventListener("mouseenter", function () {
         _cancelHide();
@@ -167,14 +168,7 @@ function _createChart(cfHistory) {
     const investingData = sorted.map(_extractField("investing_cf"));
     const financingData = sorted.map(_extractField("financing_cf"));
     const cashData = sorted.map(_extractField("cash_equivalents"));
-    const freeCfData = sorted.map(function (entry) {
-        const op = entry.items.operating_cf;
-        const inv = entry.items.investing_cf;
-        if (op !== null && inv !== null) {
-            return (op + inv) / MILLION;
-        }
-        return null;
-    });
+    const freeCfData = sorted.map(_extractFreeCf);
     const Chart = _getChartConstructor();
     if (!Chart) {
         return;
@@ -282,10 +276,10 @@ function _createChart(cfHistory) {
                     callbacks: {
                         label: function (ctx) {
                             const value = ctx.parsed.y;
-                            if (value === null) {
+                            if (typeof value !== "number" || !Number.isFinite(value)) {
                                 return (ctx.dataset.label ?? "") + ": -";
                             }
-                            return (ctx.dataset.label ?? "") + ": " + value.toLocaleString("ja-JP", { maximumFractionDigits: 0 });
+                            return (ctx.dataset.label ?? "") + ": " + _formatChartValue(value);
                         },
                     },
                 },
@@ -316,9 +310,30 @@ function _createChart(cfHistory) {
 /* ------------------------------------------------------------------ */
 function _extractField(field) {
     return function (entry) {
-        const v = entry.items[field];
-        return v !== null ? v / MILLION : null;
+        return _toMillions(_getFiniteNumber(entry.items, field));
     };
+}
+function _extractFreeCf(entry) {
+    const explicitFreeCf = _getFiniteNumber(entry.items, "free_cf");
+    if (explicitFreeCf !== null) {
+        return _toMillions(explicitFreeCf);
+    }
+    const op = _getFiniteNumber(entry.items, "operating_cf");
+    const inv = _getFiniteNumber(entry.items, "investing_cf");
+    if (op !== null && inv !== null) {
+        return _toMillions(op + inv);
+    }
+    return null;
+}
+function _getFiniteNumber(items, field) {
+    const value = items[field];
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function _toMillions(value) {
+    return value === null ? null : value / MILLION;
+}
+function _formatChartValue(value) {
+    return value.toLocaleString("ja-JP", { maximumFractionDigits: 1 }) + " 百万円";
 }
 function _formatPeriod(period) {
     if (period.length >= 7 && period[4] === "-") {
