@@ -2,8 +2,10 @@
 shikiho = "google-chrome"
 monex = "google-chrome"
 buffett_code = "google-chrome"
+google = "google-chrome"
 
 [allowed_url_prefixes]
 shikiho = "https://shikiho.toyokeizai.net/"
 monex = "https://scouter.monex.co.jp/"
 buffett_code = "https://www.buffett-code.com/"
+google = "https://www.google.com/search?"

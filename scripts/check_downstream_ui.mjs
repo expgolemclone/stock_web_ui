@@ -17,17 +17,26 @@ const DATA_FILES = [
   ['japan_company_handbook', 'data/stock_performance.db'],
   ['land_value_research', 'data/land.db'],
 ];
+const STOCK_DB_VAR_DIR = process.env.STOCK_DB_VAR_DIR || join(PARENT, 'stock_db', 'var');
 
 const DOWNSTREAMS = [
   {
     name: 'formula_screening',
     columnOrder: ['code', 'name', 'net_cash_ratio', 'price', 'per_actual'],
+    linkExpectations: [
+      { columnKey: 'fcf_yield_avg', hrefPrefix: 'https://www.google.com/search?q=', browserKey: 'google' },
+      { columnKey: 'total_payout_ratio', hrefPrefix: 'https://www.buffett-code.com/company/', browserKey: 'buffett_code' },
+    ],
   },
   {
     name: 'invest_like_legends',
     columnOrder: ['code', 'name', 'net_cash_ratio', 'price', 'amount_millions', 'ratio_percent'],
     bodyPattern: /億/,
     tabKey: 'hikari_all',
+    linkExpectations: [
+      { columnKey: 'fcf_yield_avg', hrefPrefix: 'https://www.google.com/search?q=', browserKey: 'google' },
+      { columnKey: 'total_payout_ratio', hrefPrefix: 'https://www.buffett-code.com/company/', browserKey: 'buffett_code' },
+    ],
   },
   {
     name: 'land_value_research',
@@ -188,7 +197,7 @@ function startServer(repo, app, port) {
       env: {
         ...process.env,
         HANDBOOK_DB_PATH: join(PARENT, 'japan_company_handbook', 'data', 'stock_performance.db'),
-        STOCK_DB_VAR_DIR: process.env.STOCK_DB_VAR_DIR ?? join(PARENT, 'stock_db', 'var'),
+        STOCK_DB_VAR_DIR,
         STOCK_WEB_UI_YAZI_BASE_DIR: join(PARENT, 'japan_company_handbook', 'data'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -249,6 +258,7 @@ async function verifyPage(browser, downstream, url) {
       header.getAttribute('data-column-key') || ''
     )));
     assertColumnOrder(downstream.name, headerKeys, downstream.columnOrder);
+    await assertLinkExpectations(page, downstream, headerKeys);
 
     const statusText = await page.locator('#statusMessage').innerText({ timeout: 10_000 });
     if (!/株価基準日: \d{4}-\d{2}-\d{2}/.test(statusText)) {
@@ -272,6 +282,33 @@ async function verifyPage(browser, downstream, url) {
     }
   } finally {
     await page.close();
+  }
+}
+
+async function assertLinkExpectations(page, downstream, headerKeys) {
+  if (!downstream.linkExpectations) {
+    return;
+  }
+  for (const expectation of downstream.linkExpectations) {
+    const columnIndex = headerKeys.indexOf(expectation.columnKey);
+    if (columnIndex < 0) {
+      throw new Error(`${downstream.name}: missing link expectation column: ${expectation.columnKey}`);
+    }
+    const anchor = page.locator(`#tbody tr:first-child td:nth-child(${columnIndex + 1}) a`).first();
+    const count = await anchor.count();
+    if (count === 0) {
+      throw new Error(`${downstream.name}: missing link for ${expectation.columnKey}`);
+    }
+    const href = await anchor.getAttribute('href');
+    if (!href || !href.startsWith(expectation.hrefPrefix)) {
+      throw new Error(`${downstream.name}: unexpected href for ${expectation.columnKey}: ${href}`);
+    }
+    const browserKey = await anchor.getAttribute('data-browser');
+    if (browserKey !== expectation.browserKey) {
+      throw new Error(
+        `${downstream.name}: unexpected browser key for ${expectation.columnKey}: ${browserKey}`,
+      );
+    }
   }
 }
 

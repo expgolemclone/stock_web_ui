@@ -31,12 +31,14 @@ class _BrowsersSection(TypedDict):
     shikiho: str
     monex: str
     buffett_code: str
+    google: str
 
 
 class _AllowedUrlPrefixesSection(TypedDict):
     shikiho: str
     monex: str
     buffett_code: str
+    google: str
 
 
 class _MagicNumbersToml(TypedDict):

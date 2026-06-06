@@ -69,7 +69,7 @@ const FCF_YIELD_SPEC: MetricColSpec = {
   decimals: 2,
   scale: PERCENT_SCALE,
   suffix: "%",
-  stockLink: "buffett_code",
+  stockLink: "google",
 };
 
 const PEG_5Y_SPEC: MetricColSpec = {

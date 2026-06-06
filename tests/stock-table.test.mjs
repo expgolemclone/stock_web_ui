@@ -611,3 +611,92 @@ test('stockLink=buffett_code は静的環境で direct リンクにする', asyn
   assert.equal(anchor.hasAttribute('data-browser'), false);
   assert.equal(anchor.hasAttribute('data-yazi'), false);
 });
+
+test('stockLink=google はローカル環境で会社名検索を browser 経由リンクにする', async function (t) {
+  const rows = [{ code: '7203', name: 'トヨタ自動車', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'google',
+    },
+  ];
+  const page = await setupTable({ rows, columns });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'price');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://www.google.com/search?q=' + encodeURIComponent('トヨタ自動車'));
+  assert.equal(anchor.getAttribute('data-browser'), 'google');
+});
+
+test('stockLink=google は静的環境で direct リンクにする', async function (t) {
+  const rows = [{ code: '7203', name: 'トヨタ自動車', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'google',
+    },
+  ];
+  const page = await setupTable({ rows, columns, githubPages: true });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  const anchor = getFirstCellAnchor(page.document, 'price');
+  assert.ok(anchor);
+  assert.equal(anchor.getAttribute('href'), 'https://www.google.com/search?q=' + encodeURIComponent('トヨタ自動車'));
+  assert.equal(anchor.hasAttribute('data-browser'), false);
+  assert.equal(anchor.hasAttribute('data-yazi'), false);
+});
+
+test('stockLink=google は会社名が空ならリンクにしない', async function (t) {
+  const rows = [{ code: '7203', name: '', price: 1234.5 }];
+  const columns = [
+    {
+      key: 'code',
+      header: 'コード',
+      type: 'code',
+      render: (row) => String(row.code ?? ''),
+      sortValue: (row) => Number(row.code ?? 0),
+    },
+    {
+      key: 'price',
+      header: '株価',
+      type: 'num',
+      render: (row) => String(row.price ?? ''),
+      sortValue: (row) => toNumber(row.price),
+      stockLink: 'google',
+    },
+  ];
+  const page = await setupTable({ rows, columns });
+  t.after(function () {
+    page.cleanup();
+  });
+
+  assert.equal(getFirstCellAnchor(page.document, 'price'), null);
+  assert.equal(getFirstCellText(page.document, 'price'), '1234.5');
+});

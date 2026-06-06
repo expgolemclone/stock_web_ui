@@ -19,7 +19,7 @@ export interface MetricThreshold {
 
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
 export type LinkMode = "direct" | "browser" | "yazi";
-export type StockLink = "monex" | "shikiho" | "buffett_code" | "yazi";
+export type StockLink = "monex" | "shikiho" | "buffett_code" | "google" | "yazi";
 
 export interface RenderContext {
   githubPages: boolean;
@@ -550,12 +550,11 @@ function _resolveLinkMode(col: ColumnDef, row: StockRow, context: RenderContext)
 }
 
 function _resolveStockLink(stockLink: StockLink, row: StockRow, context: RenderContext): ResolvedLink | null {
-  const code: string = String(row.code ?? "");
-  if (!code) {
-    return null;
-  }
-
   if (stockLink === "yazi") {
+    const code: string = String(row.code ?? "");
+    if (!code) {
+      return null;
+    }
     if (context.githubPages) {
       return null;
     }
@@ -563,6 +562,27 @@ function _resolveStockLink(stockLink: StockLink, row: StockRow, context: RenderC
       href: "/open-yazi/" + encodeURIComponent(code),
       linkMode: "yazi",
     };
+  }
+
+  if (stockLink === "google") {
+    const name: string = String(row.name ?? "").trim();
+    if (!name) {
+      return null;
+    }
+    const href = _buildGoogleSearchUrl(name);
+    if (context.githubPages) {
+      return { href, linkMode: "direct" };
+    }
+    return {
+      href,
+      linkMode: "browser",
+      browserKey: stockLink,
+    };
+  }
+
+  const code: string = String(row.code ?? "");
+  if (!code) {
+    return null;
   }
 
   const href: string = stockLink === "monex"
@@ -590,6 +610,10 @@ function _buildShikihoUrl(code: string): string {
 
 function _buildBuffettCodeUrl(code: string): string {
   return "https://www.buffett-code.com/company/" + encodeURIComponent(code) + "/";
+}
+
+function _buildGoogleSearchUrl(name: string): string {
+  return "https://www.google.com/search?q=" + encodeURIComponent(name);
 }
 
 function _renderMessageRow(message: string): void {

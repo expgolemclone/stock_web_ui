@@ -389,11 +389,11 @@ function _resolveLinkMode(col, row, context) {
     return typeof col.linkMode === "function" ? col.linkMode(row, context) : col.linkMode;
 }
 function _resolveStockLink(stockLink, row, context) {
-    const code = String(row.code ?? "");
-    if (!code) {
-        return null;
-    }
     if (stockLink === "yazi") {
+        const code = String(row.code ?? "");
+        if (!code) {
+            return null;
+        }
         if (context.githubPages) {
             return null;
         }
@@ -401,6 +401,25 @@ function _resolveStockLink(stockLink, row, context) {
             href: "/open-yazi/" + encodeURIComponent(code),
             linkMode: "yazi",
         };
+    }
+    if (stockLink === "google") {
+        const name = String(row.name ?? "").trim();
+        if (!name) {
+            return null;
+        }
+        const href = _buildGoogleSearchUrl(name);
+        if (context.githubPages) {
+            return { href, linkMode: "direct" };
+        }
+        return {
+            href,
+            linkMode: "browser",
+            browserKey: stockLink,
+        };
+    }
+    const code = String(row.code ?? "");
+    if (!code) {
+        return null;
     }
     const href = stockLink === "monex"
         ? _buildMonexUrl(code)
@@ -424,6 +443,9 @@ function _buildShikihoUrl(code) {
 }
 function _buildBuffettCodeUrl(code) {
     return "https://www.buffett-code.com/company/" + encodeURIComponent(code) + "/";
+}
+function _buildGoogleSearchUrl(name) {
+    return "https://www.google.com/search?q=" + encodeURIComponent(name);
 }
 function _renderMessageRow(message) {
     if (!_el.tbody || !_config) {
