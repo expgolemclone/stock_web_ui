@@ -626,6 +626,41 @@ a.monex:hover {
   white-space: nowrap;
 }
 
+.bs-head-meta {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.bs-scope-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  color: #90a0b4;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 0.58rem;
+  white-space: nowrap;
+}
+
+.bs-scope-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bs-scope-legend-item i {
+  width: 12px;
+  height: 7px;
+  border-radius: 2px;
+  background:
+    linear-gradient(
+      135deg,
+      hsl(var(--bs-scope-hue) var(--bs-scope-saturation) calc(var(--bs-scope-lightness) + 12%) / 0.95),
+      hsl(var(--bs-scope-hue) var(--bs-scope-saturation) var(--bs-scope-lightness) / 0.68)
+    );
+  box-shadow: 0 0 0 1px hsl(var(--bs-scope-hue) 74% 72% / 0.18);
+}
+
 .bs-years {
   display: grid;
   grid-template-columns: repeat(10, minmax(84px, 1fr));
@@ -701,7 +736,16 @@ a.monex:hover {
   flex: var(--bs-grow) 1 0;
   min-height: 2px;
   overflow: hidden;
-  border-top: 1px solid rgba(6, 10, 17, 0.62);
+  border-top: 1px solid rgba(6, 10, 17, 0.7);
+  background:
+    linear-gradient(
+      90deg,
+      hsl(var(--bs-scope-hue) var(--bs-scope-saturation) calc(var(--bs-scope-lightness) + 12%) / 0.94),
+      hsl(var(--bs-scope-hue) var(--bs-scope-saturation) var(--bs-scope-lightness) / 0.7)
+    );
+  box-shadow:
+    inset 3px 0 0 hsl(var(--bs-scope-hue) 88% 68% / 0.62),
+    inset 0 1px 0 hsl(var(--bs-scope-hue) 88% 76% / 0.18);
 }
 
 .bs-segment.depth-0 {
@@ -712,33 +756,21 @@ a.monex:hover {
   min-height: 8px;
 }
 
-.bs-lane-assets .bs-segment.depth-0 {
-  background: linear-gradient(90deg, rgba(38, 168, 148, 0.88), rgba(72, 197, 169, 0.68));
-}
-
-.bs-lane-funding .bs-segment.depth-0 {
-  background: linear-gradient(90deg, rgba(219, 150, 65, 0.9), rgba(238, 186, 91, 0.68));
-}
-
-.bs-lane-other .bs-segment.depth-0 {
-  background: linear-gradient(90deg, rgba(105, 137, 185, 0.8), rgba(125, 159, 214, 0.56));
-}
-
 .bs-segment.depth-1 {
-  background: rgba(255,255,255,0.18);
+  opacity: 0.94;
 }
 
 .bs-segment.depth-2,
 .bs-segment.depth-3,
 .bs-segment.depth-4 {
-  background: rgba(0, 0, 0, 0.18);
+  opacity: 0.9;
 }
 
 .bs-segment.is-negative {
   background: repeating-linear-gradient(
     135deg,
-    rgba(235, 90, 90, 0.78) 0 4px,
-    rgba(120, 32, 32, 0.66) 4px 8px
+    hsl(356 74% 58% / 0.86) 0 4px,
+    hsl(var(--bs-scope-hue) var(--bs-scope-saturation) var(--bs-scope-lightness) / 0.62) 4px 8px
   );
 }
 
@@ -760,7 +792,7 @@ a.monex:hover {
   position: absolute;
   inset: 0;
   padding-top: 14px;
-  opacity: 0.88;
+  opacity: 0.92;
 }
 
 @media (max-width: 768px) {
@@ -809,6 +841,20 @@ a.monex:hover {
   .bs-tooltip {
     width: calc(100vw - 16px);
     padding: 10px;
+  }
+
+  .bs-head {
+    align-items: flex-start;
+  }
+
+  .bs-head-meta {
+    justify-items: start;
+  }
+
+  .bs-scope-legend {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
   }
 
   .bs-years {

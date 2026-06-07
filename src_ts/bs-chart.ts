@@ -28,6 +28,8 @@ interface StockTableRef {
   getBalanceSheetHistoryUrl(code: string): string | null;
 }
 
+type BsLaneKind = "assets" | "funding" | "other";
+
 const SHOW_DELAY_MS = 260;
 const HIDE_DELAY_MS = 180;
 const BASE_HEIGHT = 220;
@@ -36,6 +38,12 @@ const MAX_YEAR_HEIGHT = 430;
 const MAX_DEPTH = 9;
 const MILLION = 1_000_000;
 const JAPANESE_TEXT_RE = /[\u3040-\u30ff\u3400-\u9fff]/;
+const SCOPE_DEPTH_HUES: Record<BsLaneKind, number[]> = {
+  assets: [166, 205, 130, 52, 292, 18, 242, 102, 334, 214],
+  funding: [34, 354, 284, 220, 146, 92, 310, 190, 18, 250],
+  other: [220, 286, 340, 32, 156, 96, 252, 12, 184, 314],
+};
+const SCOPE_DEPTH_LABELS = ["大分類", "内訳", "明細", "深部"];
 const LABEL_OVERRIDES: Record<string, string> = {
   AccountsPayableTrade: "買掛金",
   AccountsPayableForConstructionContractsCNS: "工事未払金",
@@ -353,7 +361,10 @@ function _renderHistory(code: string, history: BsHistory): void {
   _tooltip.innerHTML = [
     '<div class="bs-head">',
     '<div><span class="bs-kicker">BALANCE SHEET / XBRL</span><strong>' + escapeHtml(code) + "</strong></div>",
+    '<div class="bs-head-meta">',
     '<div class="bs-base">基準 ' + escapeHtml(history.baseline_period ?? "-") + " / " + escapeHtml(_formatMoney(history.baseline_total_assets)) + "</div>",
+    _renderScopeLegend(),
+    "</div>",
     "</div>",
     '<div class="bs-years">' + years + "</div>",
   ].join("");
@@ -385,7 +396,7 @@ function _renderLane(
   roots: BsNode[],
   periodIndex: number,
   denominator: number,
-  kind: string,
+  kind: BsLaneKind,
 ): string {
   if (roots.length === 0) {
     return "";
@@ -394,7 +405,7 @@ function _renderLane(
     '<div class="bs-lane bs-lane-' + kind + '">',
     '<div class="bs-lane-title">' + escapeHtml(title) + "</div>",
     '<div class="bs-stack">',
-    _renderSegments(roots, periodIndex, denominator, 0, []),
+    _renderSegments(roots, periodIndex, denominator, 0, [], kind),
     "</div>",
     "</div>",
   ].join("");
@@ -406,6 +417,7 @@ function _renderSegments(
   denominator: number,
   depth: number,
   path: string[],
+  laneKind: BsLaneKind,
 ): string {
   if (depth > MAX_DEPTH) {
     return "";
@@ -419,21 +431,67 @@ function _renderSegments(
     const grow = Math.max(absValue / Math.max(denominator, 1), 0.0002);
     const nextPath = path.concat([node.label || node.concept_name]);
     const conceptSuffix = node.concept_name ? " | " + node.concept_name : "";
+    const scopeStyle = _scopeStyle(node, laneKind, depth, nextPath);
     const childHtml = node.children.length > 0
-      ? '<div class="bs-children">' + _renderSegments(node.children, periodIndex, Math.max(absValue, 1), depth + 1, nextPath) + "</div>"
+      ? '<div class="bs-children">' + _renderSegments(node.children, periodIndex, Math.max(absValue, 1), depth + 1, nextPath, laneKind) + "</div>"
       : "";
     const labelHtml = depth <= 2
       ? '<span class="bs-segment-label">' + escapeHtml(node.label || node.concept_name) + "</span>"
       : "";
     return [
       '<div class="bs-segment depth-' + String(Math.min(depth, 4)) + (value !== null && value < 0 ? " is-negative" : "") + '"',
-      ' style="--bs-grow:' + String(grow) + '"',
-      ' title="' + escapeHtml(nextPath.join(" / ") + conceptSuffix + " | " + _formatMoney(value)) + '">',
+      ' style="--bs-grow:' + String(grow) + ";" + scopeStyle + '"',
+      ' title="' + escapeHtml(nextPath.join(" / ") + conceptSuffix + " | XBRL階層 " + String(depth + 1) + " | " + _formatMoney(value)) + '">',
       labelHtml,
       childHtml,
       "</div>",
     ].join("");
   }).join("");
+}
+
+function _renderScopeLegend(): string {
+  const swatches = SCOPE_DEPTH_LABELS.map(function (label, depth): string {
+    const style = _scopeStyleForDepth("assets", depth, label);
+    return [
+      '<span class="bs-scope-legend-item">',
+      '<i style="' + style + '"></i>',
+      escapeHtml(label),
+      "</span>",
+    ].join("");
+  }).join("");
+  return '<div class="bs-scope-legend" aria-label="XBRL階層色">' + swatches + "</div>";
+}
+
+function _scopeStyle(
+  node: BsNode,
+  laneKind: BsLaneKind,
+  depth: number,
+  path: string[],
+): string {
+  const key = [node.concept_namespace, node.concept_name, path.join("/")].join("#");
+  return _scopeStyleForDepth(laneKind, depth, key);
+}
+
+function _scopeStyleForDepth(laneKind: BsLaneKind, depth: number, key: string): string {
+  const palette = SCOPE_DEPTH_HUES[laneKind];
+  const baseHue = palette[depth % palette.length];
+  const jitter = depth === 0 ? 0 : (_hashText(key) % 17) - 8;
+  const hue = (baseHue + jitter + 360) % 360;
+  const saturation = _clamp(76 - depth * 3, 48, 82);
+  const lightness = _clamp(47 - depth * 2, 26, 52);
+  return [
+    "--bs-scope-hue:" + String(hue),
+    "--bs-scope-saturation:" + String(saturation) + "%",
+    "--bs-scope-lightness:" + String(lightness) + "%",
+  ].join(";");
+}
+
+function _hashText(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) % 9973;
+  }
+  return hash;
 }
 
 function _groupRoots(roots: BsNode[]): { assets: BsNode[]; funding: BsNode[]; other: BsNode[] } {
@@ -466,7 +524,7 @@ function _isStructuralWrapper(root: BsNode): boolean {
   return !root.concept_name || text.includes("heading") || text.includes("lineitems");
 }
 
-function _classifyRoot(root: BsNode): "assets" | "funding" | "other" {
+function _classifyRoot(root: BsNode): BsLaneKind {
   const text = (root.label + " " + root.concept_name).toLowerCase();
   if (
     text.includes("負債")

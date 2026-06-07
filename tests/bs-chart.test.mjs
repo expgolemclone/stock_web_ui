@@ -156,7 +156,21 @@ test('BS chart loads from StockTable URL and scales year heights from baseline a
   assert.match(tooltip.textContent, /資産/);
   assert.match(tooltip.textContent, /流動資産/);
   assert.match(tooltip.textContent, /現預金/);
+  assert.match(tooltip.textContent, /大分類/);
+  assert.match(tooltip.textContent, /内訳/);
   assert.equal(page.document.querySelectorAll('.bs-lane-assets .bs-segment').length, 6);
+
+  const rootHue = page.document.querySelector('.bs-lane-assets .bs-segment.depth-0')
+    .style.getPropertyValue('--bs-scope-hue');
+  const childHue = page.document.querySelector('.bs-lane-assets .bs-segment.depth-1')
+    .style.getPropertyValue('--bs-scope-hue');
+  const leafHue = page.document.querySelector('.bs-lane-assets .bs-segment.depth-2')
+    .style.getPropertyValue('--bs-scope-hue');
+  assert.notEqual(rootHue, '');
+  assert.notEqual(childHue, '');
+  assert.notEqual(leafHue, '');
+  assert.notEqual(rootHue, childHue);
+  assert.notEqual(childHue, leafHue);
 
   const years = [...page.document.querySelectorAll('.bs-year')];
   assert.equal(years.length, 2);
