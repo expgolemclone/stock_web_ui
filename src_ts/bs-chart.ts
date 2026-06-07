@@ -49,6 +49,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   AccumulatedDepreciationStructures: "構築物償却累計",
   AccumulatedDepreciationToolsFurnitureAndFixtures: "工具器具償却累計",
   AccumulatedDepreciationVehicles: "車両償却累計",
+  AdvancesReceivedOnUncompletedConstructionContractsCNS: "未成工事受入金",
   AllowanceForDoubtfulAccountsIOAByGroup: "貸倒引当金",
   AssetRetirementObligationsNCL: "資産除去債務",
   Assets: "資産合計",
