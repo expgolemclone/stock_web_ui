@@ -70,6 +70,10 @@ impl IndexPage {
                 &format!("{shared_base}/cf-chart.js{asset_version_suffix}"),
             )
             .replace(
+                "{{SHARED_BS_CHART_URL}}",
+                &format!("{shared_base}/bs-chart.js{asset_version_suffix}"),
+            )
+            .replace(
                 "{{APP_SCRIPT_URL}}",
                 &format!("assets/app.js{asset_version_suffix}"),
             )
@@ -543,7 +547,13 @@ fn escape_html(value: &str) -> String {
         .replace('\'', "&#x27;")
 }
 
-const ASSET_FILES: &[&str] = &["style.css", "stock-table.js", "columns.js", "cf-chart.js"];
+const ASSET_FILES: &[&str] = &[
+    "style.css",
+    "stock-table.js",
+    "columns.js",
+    "cf-chart.js",
+    "bs-chart.js",
+];
 
 fn compute_asset_hash(root: &Path) -> String {
     use std::hash::{Hash, Hasher};
@@ -563,7 +573,7 @@ fn compute_asset_hash(root: &Path) -> String {
 
 #[cfg(feature = "python")]
 mod python {
-    use super::{compute_asset_hash, IndexPage};
+    use super::{IndexPage, compute_asset_hash};
     use pyo3::prelude::*;
     use std::path::Path;
 

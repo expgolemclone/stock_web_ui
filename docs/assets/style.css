@@ -571,6 +571,198 @@ a.monex:hover {
   height: min(400px, 45vh) !important;
 }
 
+/* BS hover chart tooltip */
+
+.bs-tooltip {
+  position: fixed;
+  z-index: 55;
+  width: min(1180px, 94vw);
+  max-height: 86vh;
+  overflow: auto;
+  background:
+    linear-gradient(135deg, rgba(5, 10, 18, 0.98), rgba(12, 19, 31, 0.98)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 10px);
+  border: 1px solid rgba(138, 169, 203, 0.24);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255,255,255,0.06);
+  pointer-events: auto;
+}
+
+.bs-tooltip-message {
+  color: #c8d3df;
+  font-size: 0.88rem;
+  padding: 18px 20px;
+}
+
+.bs-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  color: #dce6f2;
+}
+
+.bs-head strong {
+  display: block;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+}
+
+.bs-kicker {
+  display: block;
+  color: #7f91a6;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+}
+
+.bs-base {
+  color: #aab8ca;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.bs-years {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(84px, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-width: 980px;
+}
+
+.bs-year {
+  display: grid;
+  grid-template-rows: auto auto var(--bs-year-height);
+  gap: 4px;
+  align-items: end;
+}
+
+.bs-year-label,
+.bs-year-total,
+.bs-lane-title {
+  font-family: "SF Mono", "Consolas", monospace;
+  text-align: center;
+}
+
+.bs-year-label {
+  color: #e1e8f0;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bs-year-total {
+  color: #93a5ba;
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.bs-lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(34px, 1fr));
+  gap: 4px;
+  height: var(--bs-year-height);
+  align-items: stretch;
+}
+
+.bs-lane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.bs-lane-title {
+  color: #7f91a6;
+  font-size: 0.52rem;
+  line-height: 1.1;
+  min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bs-stack,
+.bs-children {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.bs-stack {
+  height: 100%;
+  border: 1px solid rgba(138, 169, 203, 0.16);
+  background: rgba(255,255,255,0.025);
+}
+
+.bs-segment {
+  position: relative;
+  flex: var(--bs-grow) 1 0;
+  min-height: 2px;
+  overflow: hidden;
+  border-top: 1px solid rgba(6, 10, 17, 0.62);
+}
+
+.bs-segment.depth-0 {
+  min-height: 16px;
+}
+
+.bs-segment.depth-1 {
+  min-height: 8px;
+}
+
+.bs-lane-assets .bs-segment.depth-0 {
+  background: linear-gradient(90deg, rgba(38, 168, 148, 0.88), rgba(72, 197, 169, 0.68));
+}
+
+.bs-lane-funding .bs-segment.depth-0 {
+  background: linear-gradient(90deg, rgba(219, 150, 65, 0.9), rgba(238, 186, 91, 0.68));
+}
+
+.bs-lane-other .bs-segment.depth-0 {
+  background: linear-gradient(90deg, rgba(105, 137, 185, 0.8), rgba(125, 159, 214, 0.56));
+}
+
+.bs-segment.depth-1 {
+  background: rgba(255,255,255,0.18);
+}
+
+.bs-segment.depth-2,
+.bs-segment.depth-3,
+.bs-segment.depth-4 {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.bs-segment.is-negative {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(235, 90, 90, 0.78) 0 4px,
+    rgba(120, 32, 32, 0.66) 4px 8px
+  );
+}
+
+.bs-segment-label {
+  position: absolute;
+  inset: 1px 3px auto;
+  color: rgba(246, 250, 255, 0.88);
+  font-size: 0.54rem;
+  font-weight: 700;
+  line-height: 1.05;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.bs-children {
+  position: absolute;
+  inset: 0;
+  padding-top: 14px;
+  opacity: 0.88;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 16px 8px 28px;
@@ -612,5 +804,14 @@ a.monex:hover {
 
   td.name {
     max-width: 220px;
+  }
+
+  .bs-tooltip {
+    width: calc(100vw - 16px);
+    padding: 10px;
+  }
+
+  .bs-years {
+    min-width: 900px;
   }
 }

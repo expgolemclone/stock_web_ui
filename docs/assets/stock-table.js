@@ -55,7 +55,7 @@ const _detailMap = {};
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
-export const StockTable = { init, getRowData };
+export const StockTable = { init, getRowData, getBalanceSheetHistoryUrl };
 const _globalScope = globalThis;
 _globalScope.StockTable = StockTable;
 /* ------------------------------------------------------------------ */
@@ -66,6 +66,16 @@ function getRowData(code) {
         return null;
     }
     return _state.rows.find(function (r) { return r.code === code; }) ?? null;
+}
+function getBalanceSheetHistoryUrl(code) {
+    if (!_config?.balanceSheetHistoryUrl || !code) {
+        return null;
+    }
+    const context = { githubPages: !!_config.githubPages };
+    if (typeof _config.balanceSheetHistoryUrl === "function") {
+        return _config.balanceSheetHistoryUrl(code, context);
+    }
+    return _config.balanceSheetHistoryUrl.replace("{code}", encodeURIComponent(code));
 }
 function init(config) {
     _config = config;

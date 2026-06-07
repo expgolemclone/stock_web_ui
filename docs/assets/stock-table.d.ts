@@ -13,6 +13,7 @@ export interface MetricThreshold {
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
 export type LinkMode = "direct" | "browser" | "yazi";
 export type StockLink = "monex" | "shikiho" | "buffett_code" | "google" | "yazi";
+export type BalanceSheetHistoryUrl = string | ((code: string, context: RenderContext) => string | null);
 export interface RenderContext {
     githubPages: boolean;
 }
@@ -44,11 +45,14 @@ export interface StockTableConfig {
     defaultTabKey?: string;
     githubPages?: boolean;
     detailModal?: boolean;
+    balanceSheetHistoryUrl?: BalanceSheetHistoryUrl;
 }
 export declare const StockTable: {
     init: typeof init;
     getRowData: typeof getRowData;
+    getBalanceSheetHistoryUrl: typeof getBalanceSheetHistoryUrl;
 };
 declare function getRowData(code: string): Record<string, unknown> | null;
+declare function getBalanceSheetHistoryUrl(code: string): string | null;
 declare function init(config: StockTableConfig): void;
 export {};

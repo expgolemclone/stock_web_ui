@@ -20,6 +20,8 @@ export interface MetricThreshold {
 export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
 export type LinkMode = "direct" | "browser" | "yazi";
 export type StockLink = "monex" | "shikiho" | "buffett_code" | "google" | "yazi";
+export type BalanceSheetHistoryUrl =
+  string | ((code: string, context: RenderContext) => string | null);
 
 export interface RenderContext {
   githubPages: boolean;
@@ -54,6 +56,7 @@ export interface StockTableConfig {
   defaultTabKey?: string;
   githubPages?: boolean;
   detailModal?: boolean;
+  balanceSheetHistoryUrl?: BalanceSheetHistoryUrl;
 }
 
 interface StockRow {
@@ -154,7 +157,7 @@ const _detailMap: Record<number, string> = {};
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-export const StockTable = { init, getRowData };
+export const StockTable = { init, getRowData, getBalanceSheetHistoryUrl };
 
 const _globalScope = globalThis as typeof globalThis & { StockTable?: typeof StockTable };
 _globalScope.StockTable = StockTable;
@@ -168,6 +171,17 @@ function getRowData(code: string): Record<string, unknown> | null {
     return null;
   }
   return _state.rows.find(function (r: StockRow): boolean { return r.code === code; }) ?? null;
+}
+
+function getBalanceSheetHistoryUrl(code: string): string | null {
+  if (!_config?.balanceSheetHistoryUrl || !code) {
+    return null;
+  }
+  const context: RenderContext = { githubPages: !!_config.githubPages };
+  if (typeof _config.balanceSheetHistoryUrl === "function") {
+    return _config.balanceSheetHistoryUrl(code, context);
+  }
+  return _config.balanceSheetHistoryUrl.replace("{code}", encodeURIComponent(code));
 }
 
 function init(config: StockTableConfig): void {

@@ -21,6 +21,8 @@ def test_render_index_html_replaces_placeholders_and_escapes_values() -> None:
     assert 'href="assets/style.css?v=20260501"' in html
     assert 'src="assets/stock-table.js?v=20260501"' in html
     assert 'src="assets/columns.js?v=20260501"' in html
+    assert 'src="assets/cf-chart.js?v=20260501"' in html
+    assert 'src="assets/bs-chart.js?v=20260501"' in html
     assert 'src="assets/app.js?v=20260501"' in html
 
 
@@ -43,6 +45,14 @@ def test_render_index_html_uses_external_shared_asset_base_url() -> None:
     )
     assert (
         'src="https://expgolemclone.github.io/stock_web_ui/assets/columns.js?v=20260501"'
+        in html
+    )
+    assert (
+        'src="https://expgolemclone.github.io/stock_web_ui/assets/cf-chart.js?v=20260501"'
+        in html
+    )
+    assert (
+        'src="https://expgolemclone.github.io/stock_web_ui/assets/bs-chart.js?v=20260501"'
         in html
     )
     assert 'src="assets/app.js?v=20260501"' in html
