@@ -92,8 +92,8 @@ stock_web_ui/
 ## 開発フック
 
 - `npm run check:downstream-ui` は `formula_screening`、`invest_like_legends`、`land_value_research` を sibling repo として起動し、Playwright で実画面とステータス欄の株価基準日表示を確認する。
-- 検証は fixture ではなく、各 repo のローカル HTTP サーバーと実データを使う。`stock_db` の SQLite は `stock_db.api` 経由で読み、`STOCK_DB_VAR_DIR` だけを渡す。`japan_company_handbook/data/stock_performance.db` と `land_value_research/data/land.db` は各 repo が所有するデータソースとして直接使う。
-- 検証用サーバーでは `stock_db.api.ensure_prices_fresh()` を差し替えて外部株価更新を走らせず、ローカル DB スナップショットをそのまま表示する。下流 UI の描画契約を確認するための smoke test であり、Yahoo / Stooq の取得可否には依存させない。
+- 検証は fixture ではなく、各 repo のローカル HTTP サーバーと実データを使う。`stock_db` の SQLite は各下流 repo の公開境界経由で読み、`STOCK_DB_VAR_DIR` だけを渡す。`japan_company_handbook/data/stock_performance.db` と `land_value_research/data/land.db` は各 repo が所有するデータソースとして直接使う。
+- 検証用サーバーでは各下流 repo の `ensure_prices_fresh()` を差し替えて外部株価更新を走らせず、ローカル DB スナップショットをそのまま表示する。下流 UI の描画契約を確認するための smoke test であり、Yahoo / Stooq の取得可否には依存させない。
 - `.githooks/pre-push` は Codex と Claude Code のどちらでも効く共通の強制点で、同じ検証コマンドを呼ぶ。通常の Git checkout では `git config core.hooksPath .githooks` で有効化する。`.git` を持たない jj workspace ではこの Git hook 設定は適用できない。
 - `.claude/hooks/stop_check_downstream_ui.py` は Claude Code の Stop hook から同じ検証コマンドを呼ぶ薄い wrapper であり、判定ロジックは `scripts/check_downstream_ui.mjs` に集約する。
 

@@ -23,7 +23,7 @@ def main() -> None:
         sys.path.insert(0, str(project_dir))
 
     _disable_browser_startup()
-    _disable_stock_price_auto_refresh()
+    _disable_stock_price_auto_refresh(args.app)
 
     if args.app == "formula_screening":
         _serve_formula_screening(project_dir, args.port)
@@ -40,10 +40,14 @@ def _disable_browser_startup() -> None:
     serve_mod._release_port_if_needed = lambda _host, _port: None  # type: ignore[attr-defined]
 
 
-def _disable_stock_price_auto_refresh() -> None:
-    import stock_db.api as stock_db_api
-
-    stock_db_api.ensure_prices_fresh = lambda: None  # type: ignore[assignment]
+def _disable_stock_price_auto_refresh(app: str) -> None:
+    module_name_by_app = {
+        "formula_screening": "formula_screening.stock_db_compat",
+        "invest_like_legends": "stock_db_bridge",
+        "land_value_research": "src.stock_db_sync",
+    }
+    module = importlib.import_module(module_name_by_app[app])
+    module.ensure_prices_fresh = lambda: None  # type: ignore[attr-defined]
 
 
 def _server_config(port: int):
@@ -54,14 +58,14 @@ def _server_config(port: int):
 
 def _serve_formula_screening(project_dir: Path, port: int) -> None:
     from formula_screening.web import run_screening_strategy_payload, serve_screening_payload
-    from stock_db.api import get_screening_tickers
+    from formula_screening.stock_db_compat import get_screening_tickers
 
     strategy_path = project_dir / "strategies" / "net_cash_fcf.toml"
     tickers = get_screening_tickers(limit=20)
     payload = run_screening_strategy_payload(strategy_path, tickers=tickers, return_all=True)
 
     if not payload:
-        raise RuntimeError("formula_screening produced no rows from stock_db.api")
+        raise RuntimeError("formula_screening produced no rows from stock_db Rust CLI")
 
     serve_screening_payload(payload[:20], server_config=_server_config(port))
 
