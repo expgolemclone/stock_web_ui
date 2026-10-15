@@ -1,0 +1,39 @@
+# ホワイトリスト方式: デフォルト全無視
+*
+
+# 許可するファイル
+!.gitignore
+!pyproject.toml
+!uv.lock
+!config/
+!config/**
+!src/
+!src/**
+!rust/
+!rust/Cargo.lock
+!rust/Cargo.toml
+!rust/src/
+!rust/src/**
+!docs/
+!docs/**
+!README.md
+!ARCHITECTURE.md
+!src_ts/
+!src_ts/**
+!tsconfig.json
+!package.json
+!package-lock.json
+!tests/
+!tests/**
+!scripts/
+!scripts/**
+!.githooks/
+!.githooks/**
+!.claude/
+!.claude/**
+!.github/
+!.github/**
+
+# バイナリ・キャッシュは常に除外
+__pycache__/
+*.pyc

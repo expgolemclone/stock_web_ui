@@ -1,0 +1,58 @@
+/**
+ * Generic stock table renderer.
+ *
+ * Initialise via `StockTable.init(config)` after the DOM is ready.
+ * Each page supplies a config object that declares columns, data
+ * sources, metric thresholds, and optional tab/position behaviour.
+ */
+export type SortDirection = "asc" | "desc";
+export interface MetricThreshold {
+    good?: (v: number) => boolean;
+    bad?: (v: number) => boolean;
+}
+export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
+export type LinkMode = "direct" | "browser" | "yazi";
+export type StockLink = "monex" | "shikiho" | "buffett_code" | "google" | "yazi";
+export type BalanceSheetHistoryUrl = string | ((code: string, context: RenderContext) => string | null);
+export interface RenderContext {
+    githubPages: boolean;
+}
+export interface ColumnDef {
+    key: string;
+    header: string;
+    title?: string;
+    type: ColumnType;
+    render: (row: Record<string, unknown>) => string;
+    sortValue?: (row: Record<string, unknown>) => number | null;
+    cssClass?: string;
+    stockLink?: StockLink;
+    linkHref?: (row: Record<string, unknown>, context: RenderContext) => string | null;
+    linkMode?: LinkMode | ((row: Record<string, unknown>, context: RenderContext) => LinkMode);
+    browserKey?: string;
+    isPosition?: boolean;
+    toggleable?: boolean;
+    detailContent?: (row: Record<string, unknown>) => string | null;
+}
+export interface StockTableConfig {
+    defaultTitle: string;
+    dataUrl: string;
+    metadataUrl?: string;
+    columns: ColumnDef[];
+    metricThresholds: Record<string, MetricThreshold>;
+    defaultSortKey: string;
+    defaultSortDirection: SortDirection;
+    tabMode?: boolean;
+    defaultTabKey?: string;
+    githubPages?: boolean;
+    detailModal?: boolean;
+    balanceSheetHistoryUrl?: BalanceSheetHistoryUrl;
+}
+export declare const StockTable: {
+    init: typeof init;
+    getRowData: typeof getRowData;
+    getBalanceSheetHistoryUrl: typeof getBalanceSheetHistoryUrl;
+};
+declare function getRowData(code: string): Record<string, unknown> | null;
+declare function getBalanceSheetHistoryUrl(code: string): string | null;
+declare function init(config: StockTableConfig): void;
+export {};

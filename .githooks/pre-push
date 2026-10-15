@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if [ "${STOCK_WEB_UI_SKIP_DOWNSTREAM_UI_CHECK:-}" = "1" ]; then
+  echo "stock_web_ui downstream UI check skipped by STOCK_WEB_UI_SKIP_DOWNSTREAM_UI_CHECK=1"
+  exit 0
+fi
+
+npm run check:downstream-ui

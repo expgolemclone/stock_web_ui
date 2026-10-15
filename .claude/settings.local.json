@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run check:downstream-ui)",
+      "Bash(python3 .claude/hooks/stop_check_downstream_ui.py)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_check_downstream_ui.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

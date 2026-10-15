@@ -1,0 +1,945 @@
+/**
+ * Generic stock table renderer.
+ *
+ * Initialise via `StockTable.init(config)` after the DOM is ready.
+ * Each page supplies a config object that declares columns, data
+ * sources, metric thresholds, and optional tab/position behaviour.
+ */
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+const ASC_ARROW = "\u25B2";
+const DESC_ARROW = "\u25BC";
+const INACTIVE_ARROW = "\u25BD";
+const HIDDEN_COLUMNS_KEY = "hiddenColumns";
+const STICKY_COLUMN_KEYS = ["code", "name", "net_cash_ratio"];
+const STICKY_COLUMN_CLASS_BY_KEY = {
+    code: "sticky-code",
+    name: "sticky-name",
+    net_cash_ratio: "sticky-net-cash-ratio",
+};
+const STICKY_LEFT_CLASS_BY_PREVIOUS_KEYS = {
+    "": "sticky-left-0",
+    code: "sticky-left-code",
+    name: "sticky-left-name",
+    net_cash_ratio: "sticky-left-net-cash-ratio",
+    "code|name": "sticky-left-code-name",
+    "code|net_cash_ratio": "sticky-left-code-net-cash-ratio",
+    "name|net_cash_ratio": "sticky-left-name-net-cash-ratio",
+};
+/* ------------------------------------------------------------------ */
+/*  State                                                              */
+/* ------------------------------------------------------------------ */
+let _config = null;
+const _state = {
+    rows: null,
+    priceDate: null,
+    targetPriceDate: null,
+    currentTab: "",
+    sortKey: "",
+    sortDir: "asc",
+    hiddenCols: new Set(),
+    loading: true,
+    error: "",
+};
+const _el = {
+    tabBar: null,
+    status: null,
+    thead: null,
+    tbody: null,
+    toggleBar: null,
+    exportBtn: null,
+};
+let _detailIndex = 0;
+const _detailMap = {};
+/* ------------------------------------------------------------------ */
+/*  Public API                                                         */
+/* ------------------------------------------------------------------ */
+export const StockTable = { init, getRowData, getBalanceSheetHistoryUrl };
+const _globalScope = globalThis;
+_globalScope.StockTable = StockTable;
+/* ------------------------------------------------------------------ */
+/*  Initialisation                                                     */
+/* ------------------------------------------------------------------ */
+function getRowData(code) {
+    if (!_state.rows) {
+        return null;
+    }
+    return _state.rows.find(function (r) { return r.code === code; }) ?? null;
+}
+function getBalanceSheetHistoryUrl(code) {
+    if (!_config?.balanceSheetHistoryUrl || !code) {
+        return null;
+    }
+    const context = { githubPages: !!_config.githubPages };
+    if (typeof _config.balanceSheetHistoryUrl === "function") {
+        return _config.balanceSheetHistoryUrl(code, context);
+    }
+    return _config.balanceSheetHistoryUrl.replace("{code}", encodeURIComponent(code));
+}
+function init(config) {
+    _config = config;
+    _state.rows = null;
+    _state.priceDate = null;
+    _state.targetPriceDate = null;
+    _state.sortKey = config.defaultSortKey;
+    _state.sortDir = config.defaultSortDirection;
+    _state.currentTab = "";
+    _state.loading = true;
+    _state.error = "";
+    _state.hiddenCols = _sanitizeHiddenCols(_loadHiddenCols());
+    _saveHiddenCols(_state.hiddenCols);
+    _el.tabBar = document.getElementById("tabBar");
+    _el.status = document.getElementById("statusMessage");
+    _el.thead = document.querySelector("#stockTable > thead");
+    _el.tbody = document.getElementById("tbody");
+    _el.toggleBar = document.getElementById("toggleBar");
+    _el.exportBtn = _createExportButton();
+    if (config.detailModal) {
+        _createModal();
+    }
+    _renderToggleChips();
+    _bindEvents();
+    _render();
+    void _loadData();
+    void _loadMetadata();
+}
+/* ------------------------------------------------------------------ */
+/*  Data loading                                                       */
+/* ------------------------------------------------------------------ */
+async function _loadData() {
+    if (!_config) {
+        return;
+    }
+    try {
+        const response = await fetch(_config.dataUrl, { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+        const raw = await response.json();
+        _state.rows = _normalizeRows(raw);
+        _state.loading = false;
+        _state.error = "";
+        if (_config.tabMode && _state.rows.length > 0 && _state.rows[0]._tabKey !== undefined) {
+            _state.currentTab = _resolveDefaultTab(_state.rows);
+        }
+        _render();
+    }
+    catch (err) {
+        console.error(err);
+        _state.loading = false;
+        _state.error = "データを読み込めませんでした。";
+        _render();
+    }
+}
+async function _loadMetadata() {
+    if (!_config?.metadataUrl) {
+        return;
+    }
+    try {
+        const response = await fetch(_config.metadataUrl, { cache: "no-store" });
+        if (!response.ok) {
+            return;
+        }
+        const raw = await response.json();
+        const metadata = _normalizePriceMetadata(raw);
+        _state.priceDate = metadata.priceDate;
+        _state.targetPriceDate = metadata.targetPriceDate;
+        if (!_state.loading && !_state.error) {
+            _render();
+        }
+    }
+    catch (_err) {
+        _state.priceDate = null;
+        _state.targetPriceDate = null;
+    }
+}
+/* ------------------------------------------------------------------ */
+/*  Normalisation                                                      */
+/* ------------------------------------------------------------------ */
+/**
+ * Accepts two shapes:
+ *   1) Flat array  →  [{ code, name, … }, …]
+ *   2) Tab object  →  { watch: { name, stocks: […] }, … }
+ *
+ * Tab rows receive a `_tabKey` property so the renderer can filter.
+ */
+function _normalizeRows(raw) {
+    if (Array.isArray(raw)) {
+        return raw;
+    }
+    if (raw && typeof raw === "object") {
+        const result = [];
+        for (const [tabKey, ds] of Object.entries(raw)) {
+            const dataset = ds;
+            if (!dataset || !Array.isArray(dataset.stocks)) {
+                continue;
+            }
+            for (const stock of dataset.stocks) {
+                const row = stock;
+                row._tabKey = tabKey;
+                row._tabName = dataset.name || tabKey;
+                result.push(row);
+            }
+        }
+        return result;
+    }
+    return [];
+}
+function _normalizePriceMetadata(raw) {
+    if (!raw || typeof raw !== "object") {
+        return { priceDate: null, targetPriceDate: null };
+    }
+    const record = raw;
+    const priceDate = _normalizeDateString(record.price_date);
+    const targetPriceDate = _normalizeDateString(record.target_price_date) ?? priceDate;
+    return { priceDate, targetPriceDate };
+}
+function _normalizeDateString(value) {
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+function _resolveDefaultTab(rows) {
+    if (!_config) {
+        return "";
+    }
+    const keys = [];
+    const seen = {};
+    for (const r of rows) {
+        if (r._tabKey && !seen[r._tabKey]) {
+            seen[r._tabKey] = true;
+            keys.push(r._tabKey);
+        }
+    }
+    if (_config.defaultTabKey && seen[_config.defaultTabKey]) {
+        return _config.defaultTabKey;
+    }
+    return keys.length > 0 ? keys[0] : "";
+}
+/* ------------------------------------------------------------------ */
+/*  Rendering                                                          */
+/* ------------------------------------------------------------------ */
+function _render() {
+    _renderHead();
+    _renderTabs();
+    _renderSortButtons();
+    _renderToggleChips();
+    if (_state.loading) {
+        document.title = _config ? _config.defaultTitle : "";
+        _el.status.textContent = "データを読み込み中です。";
+        _renderMessageRow("データを読み込み中です。");
+        _updateExportButton();
+        return;
+    }
+    if (_state.error) {
+        document.title = _config ? _config.defaultTitle : "";
+        _el.status.textContent = _state.error;
+        _renderMessageRow(_state.error);
+        _updateExportButton();
+        return;
+    }
+    const visible = _getVisibleRows();
+    const tabName = _getActiveTabName();
+    document.title = tabName ? tabName + " - " + _config.defaultTitle : _config.defaultTitle;
+    _el.status.textContent = _formatStatus(visible.length);
+    _updateExportButton();
+    if (visible.length === 0) {
+        _renderMessageRow("該当する銘柄はありません。");
+        return;
+    }
+    _renderBody(visible);
+}
+function _formatStatus(visibleCount) {
+    let message = visibleCount.toLocaleString("ja-JP") + " 件";
+    if (_state.priceDate) {
+        message += " / 株価基準日: " + _state.priceDate;
+    }
+    return message;
+}
+function _renderHead() {
+    if (!_el.thead) {
+        return;
+    }
+    const tr = _el.thead.querySelector("tr") || document.createElement("tr");
+    tr.innerHTML = "";
+    for (const col of _config ? _config.columns : []) {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.className = _getColumnClassName(col, "th");
+        if (col.title) {
+            th.title = col.title;
+        }
+        th.dataset.columnKey = col.key;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sort-button";
+        btn.dataset.sortColumn = col.key;
+        btn.textContent = col.header + " ";
+        const arrow = document.createElement("span");
+        arrow.className = "arrow";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = INACTIVE_ARROW;
+        btn.appendChild(arrow);
+        th.appendChild(btn);
+        tr.appendChild(th);
+    }
+    if (!_el.thead.contains(tr)) {
+        _el.thead.appendChild(tr);
+    }
+}
+function _renderBody(rows) {
+    if (!_el.tbody || !_config) {
+        return;
+    }
+    const cols = _config.columns;
+    const context = { githubPages: !!_config.githubPages };
+    _el.tbody.innerHTML = rows.map(function (row) {
+        const priceUnavailable = _isPriceUnavailable(row);
+        const cells = cols.map(function (col) {
+            const extraCls = _metricCls(col, row);
+            const cautionCls = col.key === "price" && priceUnavailable ? " price-caution-cell" : "";
+            const cellClass = _getColumnClassName(col, "td", extraCls + cautionCls);
+            return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context, priceUnavailable) + "</td>";
+        });
+        const rowClass = priceUnavailable ? ' class="price-unavailable"' : "";
+        return "<tr" + rowClass + ">" + cells.join("") + "</tr>";
+    }).join("");
+}
+function _isPriceUnavailable(row) {
+    const hasPriceField = Object.prototype.hasOwnProperty.call(row, "price");
+    const hasPriceDateField = Object.prototype.hasOwnProperty.call(row, "price_date");
+    if (!hasPriceField && !hasPriceDateField) {
+        return false;
+    }
+    const price = row.price;
+    if (typeof price !== "number" || !Number.isFinite(price)) {
+        return true;
+    }
+    if (!_state.targetPriceDate) {
+        return false;
+    }
+    const rowPriceDate = _normalizeDateString(row.price_date);
+    return rowPriceDate === null || rowPriceDate < _state.targetPriceDate;
+}
+function _renderCellContent(col, row, context, priceUnavailable) {
+    let renderedContent;
+    if (col.detailContent && _config?.detailModal) {
+        const detail = col.detailContent(row);
+        if (detail) {
+            const idx = _detailIndex++;
+            _detailMap[idx] = detail;
+            renderedContent = '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+            return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+        }
+        renderedContent = col.render(row);
+        return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+    }
+    const content = col.render(row);
+    const resolvedLink = _resolveColumnLink(col, row, context);
+    if (resolvedLink === null) {
+        renderedContent = content;
+        return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+    }
+    const attrs = [
+        'href="' + escapeHtml(resolvedLink.href) + '"',
+        'target="_blank"',
+        'rel="noopener"',
+    ];
+    if (resolvedLink.linkMode === "browser" && resolvedLink.browserKey) {
+        attrs.push('data-browser="' + escapeHtml(resolvedLink.browserKey) + '"');
+    }
+    else if (resolvedLink.linkMode === "yazi") {
+        attrs.push("data-yazi");
+    }
+    renderedContent = "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+    return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+}
+function _renderPriceCaution(col, row, renderedContent, priceUnavailable) {
+    if (col.key !== "price" || !priceUnavailable) {
+        return renderedContent;
+    }
+    const label = _getPriceCautionLabel(row);
+    return '<span class="price-caution-value">' + renderedContent + '</span>'
+        + '<span class="price-caution-badge" role="img" aria-label="' + escapeHtml(label) + '" title="' + escapeHtml(label) + '">!</span>';
+}
+function _getPriceCautionLabel(row) {
+    const price = row.price;
+    if (typeof price !== "number" || !Number.isFinite(price)) {
+        return "株価未取得";
+    }
+    const rowPriceDate = _normalizeDateString(row.price_date);
+    if (rowPriceDate && _state.targetPriceDate) {
+        return "株価が古い: " + rowPriceDate + " / 基準日: " + _state.targetPriceDate;
+    }
+    if (_state.targetPriceDate) {
+        return "株価の日付未取得 / 基準日: " + _state.targetPriceDate;
+    }
+    return "株価未取得";
+}
+function _resolveColumnLink(col, row, context) {
+    if (col.stockLink) {
+        return _resolveStockLink(col.stockLink, row, context);
+    }
+    if (!col.linkHref) {
+        return null;
+    }
+    const href = col.linkHref(row, context);
+    if (!href) {
+        return null;
+    }
+    return {
+        href,
+        linkMode: _resolveLinkMode(col, row, context),
+        browserKey: col.browserKey,
+    };
+}
+function _resolveLinkMode(col, row, context) {
+    if (!col.linkMode) {
+        return undefined;
+    }
+    return typeof col.linkMode === "function" ? col.linkMode(row, context) : col.linkMode;
+}
+function _resolveStockLink(stockLink, row, context) {
+    if (stockLink === "yazi") {
+        const code = String(row.code ?? "");
+        if (!code) {
+            return null;
+        }
+        if (context.githubPages) {
+            return null;
+        }
+        return {
+            href: "/open-yazi/" + encodeURIComponent(code),
+            linkMode: "yazi",
+        };
+    }
+    if (stockLink === "google") {
+        const name = String(row.name ?? "").trim();
+        if (!name) {
+            return null;
+        }
+        const href = _buildGoogleSearchUrl(name);
+        if (context.githubPages) {
+            return { href, linkMode: "direct" };
+        }
+        return {
+            href,
+            linkMode: "browser",
+            browserKey: stockLink,
+        };
+    }
+    const code = String(row.code ?? "");
+    if (!code) {
+        return null;
+    }
+    const href = stockLink === "monex"
+        ? _buildMonexUrl(code)
+        : stockLink === "shikiho"
+            ? _buildShikihoUrl(code)
+            : _buildBuffettCodeUrl(code);
+    if (context.githubPages) {
+        return { href, linkMode: "direct" };
+    }
+    return {
+        href,
+        linkMode: "browser",
+        browserKey: stockLink,
+    };
+}
+function _buildMonexUrl(code) {
+    return "https://monex.ifis.co.jp/index.php?sa=report_zaimu&bcode=" + encodeURIComponent(code);
+}
+function _buildShikihoUrl(code) {
+    return "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(code) + "/shikiho";
+}
+function _buildBuffettCodeUrl(code) {
+    return "https://www.buffett-code.com/company/" + encodeURIComponent(code) + "/";
+}
+function _buildGoogleSearchUrl(name) {
+    return "https://www.google.com/search?q=" + encodeURIComponent(name);
+}
+function _renderMessageRow(message) {
+    if (!_el.tbody || !_config) {
+        return;
+    }
+    const visibleCount = _config.columns.length - _state.hiddenCols.size;
+    _el.tbody.innerHTML = '<tr><td class="table-message" colspan="' + visibleCount + '">' + escapeHtml(message) + "</td></tr>";
+}
+function _renderTabs() {
+    if (!_el.tabBar || !_config || !_config.tabMode || !_state.rows) {
+        if (_el.tabBar) {
+            _el.tabBar.innerHTML = "";
+        }
+        return;
+    }
+    const tabMap = {};
+    for (const r of _state.rows) {
+        if (r._tabKey && !tabMap[r._tabKey]) {
+            tabMap[r._tabKey] = r._tabName || r._tabKey;
+        }
+    }
+    const entries = Object.entries(tabMap);
+    _el.tabBar.innerHTML = entries.map(function (pair) {
+        const isActive = pair[0] === _state.currentTab;
+        return '<button class="tab' + (isActive ? " active" : "") + '" type="button" data-tab-key="' + escapeHtml(pair[0]) + '" aria-selected="' + String(isActive) + '">' + escapeHtml(pair[1]) + "</button>";
+    }).join("");
+}
+function _renderSortButtons() {
+    if (!_el.thead) {
+        return;
+    }
+    _el.thead.querySelectorAll(".sort-button").forEach(function (btn) {
+        const key = btn.dataset.sortColumn;
+        const isActive = _state.sortKey === key;
+        const arrow = btn.querySelector(".arrow");
+        if (arrow) {
+            arrow.textContent = isActive ? (_state.sortDir === "asc" ? ASC_ARROW : DESC_ARROW) : INACTIVE_ARROW;
+        }
+        btn.classList.toggle("active", isActive);
+        const th = btn.closest("th");
+        if (th) {
+            th.setAttribute("aria-sort", isActive ? (_state.sortDir === "asc" ? "ascending" : "descending") : "none");
+        }
+    });
+}
+function _renderToggleChips() {
+    if (!_el.toggleBar || !_config) {
+        return;
+    }
+    const toggleable = _getHideableColumns();
+    _el.toggleBar.innerHTML = toggleable.map(function (col) {
+        const isActive = !_isColumnHidden(col.key);
+        return '<button class="toggle-chip' + (isActive ? " active" : "") + '" type="button" data-toggle-column="' + escapeHtml(col.key) + '">' + escapeHtml(col.header) + "</button>";
+    }).join("");
+}
+/* ------------------------------------------------------------------ */
+/*  Metric colouring                                                   */
+/* ------------------------------------------------------------------ */
+function _metricCls(col, row) {
+    if (!_config) {
+        return "";
+    }
+    const t = _config.metricThresholds[col.key];
+    if (!t) {
+        return "";
+    }
+    const raw = col.sortValue ? col.sortValue(row) : null;
+    if (raw === null || raw === undefined) {
+        return " metric-cell";
+    }
+    if (t.good && t.good(raw)) {
+        return " metric-cell metric-good";
+    }
+    if (t.bad && t.bad(raw)) {
+        return " metric-cell metric-bad";
+    }
+    return " metric-cell";
+}
+/* ------------------------------------------------------------------ */
+/*  Sorting & filtering                                                */
+/* ------------------------------------------------------------------ */
+function _getVisibleRows() {
+    if (!_state.rows || !_config) {
+        return [];
+    }
+    let rows = _state.rows;
+    if (_config.tabMode && _state.currentTab) {
+        rows = rows.filter(function (r) { return r._tabKey === _state.currentTab; });
+    }
+    return rows.slice().sort(function (a, b) {
+        const col = _findColumn(_state.sortKey);
+        if (!col || !col.sortValue) {
+            return 0;
+        }
+        const av = col.sortValue(a);
+        const bv = col.sortValue(b);
+        const dir = _state.sortDir === "asc" ? 1 : -1;
+        if (av === null && bv === null) {
+            return (a.code || "").localeCompare(b.code || "", "ja", { numeric: true });
+        }
+        if (av === null) {
+            return 1;
+        }
+        if (bv === null) {
+            return -1;
+        }
+        return (av - bv) * dir;
+    });
+}
+function _getActiveTabName() {
+    if (!_state.rows || !_state.currentTab) {
+        return "";
+    }
+    const row = _state.rows.find(function (r) { return r._tabKey === _state.currentTab; });
+    return row ? row._tabName || "" : "";
+}
+function _findColumn(key) {
+    if (!_config) {
+        return null;
+    }
+    for (const col of _config.columns) {
+        if (col.key === key) {
+            return col;
+        }
+    }
+    return null;
+}
+function _getHideableColumns() {
+    if (!_config) {
+        return [];
+    }
+    return _config.columns.filter(function (col) {
+        return _isColumnHideable(col);
+    });
+}
+function _isColumnHideable(col) {
+    return !!_config && !!col.toggleable && col.key !== _config.defaultSortKey;
+}
+function _sanitizeHiddenCols(cols) {
+    const hideableKeys = new Set(_getHideableColumns().map(function (col) {
+        return col.key;
+    }));
+    return new Set(Array.from(cols).filter(function (key) {
+        return hideableKeys.has(key);
+    }));
+}
+function _isColumnHidden(key) {
+    return _state.hiddenCols.has(key);
+}
+function _getColumnClassName(col, element, extraClass) {
+    const classes = [];
+    if (element === "td") {
+        classes.push(col.type);
+    }
+    if (col.cssClass) {
+        classes.push(col.cssClass);
+    }
+    if (col.isPosition) {
+        classes.push("column-position");
+    }
+    if (_isColumnHidden(col.key)) {
+        classes.push("hidden-col");
+    }
+    const stickyPlacement = _getStickyColumnPlacement(col);
+    if (stickyPlacement) {
+        classes.push("sticky-col", stickyPlacement.keyClass, stickyPlacement.leftClass);
+    }
+    if (extraClass) {
+        classes.push(extraClass.trim());
+    }
+    return classes.filter(Boolean).join(" ");
+}
+function _getStickyColumnPlacement(col) {
+    if (!_config || _isColumnHidden(col.key) || !_isStickyColumnKey(col.key)) {
+        return null;
+    }
+    const stickyColumns = _config.columns.filter(function (candidate) {
+        return !_isColumnHidden(candidate.key) && _isStickyColumnKey(candidate.key);
+    });
+    const index = stickyColumns.findIndex(function (candidate) {
+        return candidate.key === col.key;
+    });
+    if (index < 0) {
+        return null;
+    }
+    return {
+        keyClass: STICKY_COLUMN_CLASS_BY_KEY[col.key],
+        leftClass: _getStickyLeftClass(stickyColumns, index),
+    };
+}
+function _isStickyColumnKey(key) {
+    return STICKY_COLUMN_KEYS.includes(key);
+}
+function _getStickyLeftClass(stickyColumns, index) {
+    const previousKeys = stickyColumns.slice(0, index).map(function (col) {
+        return col.key;
+    }).sort(function (a, b) {
+        return STICKY_COLUMN_KEYS.indexOf(a) - STICKY_COLUMN_KEYS.indexOf(b);
+    });
+    return STICKY_LEFT_CLASS_BY_PREVIOUS_KEYS[previousKeys.join("|")] || "sticky-left-0";
+}
+function _resetSortToDefault() {
+    if (!_config) {
+        return;
+    }
+    _state.sortKey = _config.defaultSortKey;
+    _state.sortDir = _config.defaultSortDirection;
+}
+/* ------------------------------------------------------------------ */
+/*  Event binding                                                      */
+/* ------------------------------------------------------------------ */
+function _bindEvents() {
+    /* sort buttons */
+    document.addEventListener("click", function (e) {
+        const btn = e.target instanceof Element ? e.target.closest(".sort-button") : null;
+        if (!btn) {
+            return;
+        }
+        const key = btn.dataset.sortColumn;
+        if (!key) {
+            return;
+        }
+        if (_state.sortKey === key) {
+            _state.sortDir = _state.sortDir === "asc" ? "desc" : "asc";
+        }
+        else {
+            _state.sortKey = key;
+            _state.sortDir = key === _config.defaultSortKey ? _config.defaultSortDirection : "asc";
+        }
+        _render();
+    });
+    /* export csv */
+    if (_el.exportBtn) {
+        _el.exportBtn.addEventListener("click", function () {
+            _exportCsv();
+        });
+    }
+    /* toggle chips */
+    if (_el.toggleBar) {
+        _el.toggleBar.addEventListener("click", function (e) {
+            const chip = e.target instanceof Element ? e.target.closest("[data-toggle-column]") : null;
+            if (!chip) {
+                return;
+            }
+            const col = chip.dataset.toggleColumn;
+            if (!col) {
+                return;
+            }
+            const columnDef = _findColumn(col);
+            if (!columnDef || !_isColumnHideable(columnDef)) {
+                return;
+            }
+            if (_state.hiddenCols.has(col)) {
+                _state.hiddenCols.delete(col);
+            }
+            else {
+                _state.hiddenCols.add(col);
+                if (_state.sortKey === col) {
+                    _resetSortToDefault();
+                }
+            }
+            _state.hiddenCols = _sanitizeHiddenCols(_state.hiddenCols);
+            _saveHiddenCols(_state.hiddenCols);
+            _render();
+        });
+    }
+    /* tabs */
+    if (_el.tabBar) {
+        _el.tabBar.addEventListener("click", function (e) {
+            const tab = e.target instanceof Element ? e.target.closest("[data-tab-key]") : null;
+            if (!tab) {
+                return;
+            }
+            const key = tab.dataset.tabKey;
+            if (!key) {
+                return;
+            }
+            _state.currentTab = key;
+            _resetSortToDefault();
+            _render();
+        });
+    }
+    /* browser link interception */
+    document.addEventListener("click", function (e) {
+        const link = e.target instanceof Element ? e.target.closest("a[data-browser]") : null;
+        if (!link) {
+            return;
+        }
+        const browserKey = link.getAttribute("data-browser") || "";
+        const url = link.href;
+        e.preventDefault();
+        fetch("/open?browser=" + encodeURIComponent(browserKey) + "&url=" + encodeURIComponent(url))
+            .then(function (response) {
+            if (!response.ok) {
+                window.open(url, "_blank", "noopener");
+            }
+        })
+            .catch(function () {
+            window.open(url, "_blank", "noopener");
+        });
+    });
+    /* yazi link interception */
+    document.addEventListener("click", function (e) {
+        const link = e.target instanceof Element ? e.target.closest("a[data-yazi]") : null;
+        if (!link) {
+            return;
+        }
+        e.preventDefault();
+        fetch(link.href).catch(function () { });
+    });
+    /* detail modal */
+    document.addEventListener("click", function (e) {
+        const btn = e.target instanceof Element ? e.target.closest(".detail-btn") : null;
+        if (!btn) {
+            return;
+        }
+        const idx = btn.dataset.detailIdx;
+        if (idx === undefined) {
+            return;
+        }
+        const content = _detailMap[Number(idx)];
+        if (content === undefined) {
+            return;
+        }
+        _openDetailModal(content);
+    });
+}
+/* ------------------------------------------------------------------ */
+/*  Detail modal                                                       */
+/* ------------------------------------------------------------------ */
+function _createModal() {
+    const modal = document.createElement("div");
+    modal.id = "detail-modal";
+    modal.className = "detail-modal hidden";
+    modal.innerHTML =
+        '<div class="detail-modal-backdrop"></div>' +
+            '<div class="detail-modal-content">' +
+            '<button class="detail-modal-close" type="button">&times;</button>' +
+            '<div class="detail-modal-body"></div>' +
+            "</div>";
+    document.body.appendChild(modal);
+    const backdrop = modal.querySelector(".detail-modal-backdrop");
+    const closeBtn = modal.querySelector(".detail-modal-close");
+    if (backdrop) {
+        backdrop.addEventListener("click", _closeDetailModal);
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener("click", _closeDetailModal);
+    }
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+            _closeDetailModal();
+        }
+    });
+}
+function _openDetailModal(html) {
+    const modal = document.getElementById("detail-modal");
+    if (!modal) {
+        return;
+    }
+    const body = modal.querySelector(".detail-modal-body");
+    if (body) {
+        body.innerHTML = html;
+    }
+    modal.classList.remove("hidden");
+}
+function _closeDetailModal() {
+    const modal = document.getElementById("detail-modal");
+    if (!modal) {
+        return;
+    }
+    modal.classList.add("hidden");
+    const body = modal.querySelector(".detail-modal-body");
+    if (body) {
+        body.innerHTML = "";
+    }
+}
+/* ------------------------------------------------------------------ */
+/*  LocalStorage helpers                                               */
+/* ------------------------------------------------------------------ */
+function _loadHiddenCols() {
+    try {
+        const stored = localStorage.getItem(HIDDEN_COLUMNS_KEY);
+        if (stored) {
+            return new Set(JSON.parse(stored));
+        }
+    }
+    catch (_e) {
+        localStorage.removeItem(HIDDEN_COLUMNS_KEY);
+    }
+    return new Set();
+}
+function _saveHiddenCols(cols) {
+    try {
+        localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(Array.from(cols)));
+    }
+    catch (_e) {
+        /* storage full or blocked → silently degrade */
+    }
+}
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+function escapeHtml(value) {
+    return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+/* ------------------------------------------------------------------ */
+/*  CSV Export                                                          */
+/* ------------------------------------------------------------------ */
+function _createExportButton() {
+    const toolbar = _el.toggleBar?.parentElement ?? null;
+    if (!toolbar) {
+        return null;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "export-csv-btn";
+    btn.textContent = "CSV";
+    btn.style.display = "none";
+    toolbar.appendChild(btn);
+    return btn;
+}
+function _updateExportButton() {
+    if (!_el.exportBtn) {
+        return;
+    }
+    const visible = _getVisibleRows();
+    _el.exportBtn.style.display = visible.length > 0 ? "" : "none";
+}
+function _exportCsv() {
+    if (!_config || !_state.rows) {
+        return;
+    }
+    const visible = _getVisibleRows();
+    if (visible.length === 0) {
+        return;
+    }
+    const visibleCols = _config.columns.filter((col) => !_isColumnHidden(col.key));
+    const header = visibleCols
+        .map((col) => _csvEscape(col.header))
+        .join(",");
+    const rows = visible.map((row) => {
+        return visibleCols
+            .map((col) => _csvEscape(_stripHtml(col.render(row))))
+            .join(",");
+    });
+    const csv = "\uFEFF" + header + "\n" + rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const now = new Date();
+    const ts = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+        "_",
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+    ].join("");
+    const filename = _config.defaultTitle.replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+/g, "_") + "_" + ts + ".csv";
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+}
+function _stripHtml(html) {
+    return html
+        .replace(/<[^>]*>/g, "")
+        .replaceAll("&amp;", "&")
+        .replaceAll("&lt;", "<")
+        .replaceAll("&gt;", ">")
+        .replaceAll("&quot;", '"')
+        .replaceAll("&#39;", "'")
+        .replaceAll("&nbsp;", " ");
+}
+function _csvEscape(value) {
+    if (value.includes('"') || value.includes(",") || value.includes("\n") || value.includes("\r")) {
+        return '"' + value.replaceAll('"', '""') + '"';
+    }
+    return value;
+}

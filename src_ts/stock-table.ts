@@ -1,0 +1,1173 @@
+/**
+ * Generic stock table renderer.
+ *
+ * Initialise via `StockTable.init(config)` after the DOM is ready.
+ * Each page supplies a config object that declares columns, data
+ * sources, metric thresholds, and optional tab/position behaviour.
+ */
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+export type SortDirection = "asc" | "desc";
+
+export interface MetricThreshold {
+  good?: (v: number) => boolean;
+  bad?: (v: number) => boolean;
+}
+
+export type ColumnType = "text" | "num" | "code" | "name" | "links" | "position";
+export type LinkMode = "direct" | "browser" | "yazi";
+export type StockLink = "monex" | "shikiho" | "buffett_code" | "google" | "yazi";
+export type BalanceSheetHistoryUrl =
+  string | ((code: string, context: RenderContext) => string | null);
+
+export interface RenderContext {
+  githubPages: boolean;
+}
+
+export interface ColumnDef {
+  key: string;
+  header: string;
+  title?: string;
+  type: ColumnType;
+  render: (row: Record<string, unknown>) => string;
+  sortValue?: (row: Record<string, unknown>) => number | null;
+  cssClass?: string;
+  stockLink?: StockLink;
+  linkHref?: (row: Record<string, unknown>, context: RenderContext) => string | null;
+  linkMode?: LinkMode | ((row: Record<string, unknown>, context: RenderContext) => LinkMode);
+  browserKey?: string;
+  isPosition?: boolean;
+  toggleable?: boolean;
+  detailContent?: (row: Record<string, unknown>) => string | null;
+}
+
+export interface StockTableConfig {
+  defaultTitle: string;
+  dataUrl: string;
+  metadataUrl?: string;
+  columns: ColumnDef[];
+  metricThresholds: Record<string, MetricThreshold>;
+  defaultSortKey: string;
+  defaultSortDirection: SortDirection;
+  tabMode?: boolean;
+  defaultTabKey?: string;
+  githubPages?: boolean;
+  detailModal?: boolean;
+  balanceSheetHistoryUrl?: BalanceSheetHistoryUrl;
+}
+
+interface StockRow {
+  code?: string;
+  name?: string;
+  _tabKey?: string;
+  _tabName?: string;
+  [key: string]: unknown;
+}
+
+interface State {
+  rows: StockRow[] | null;
+  priceDate: string | null;
+  targetPriceDate: string | null;
+  currentTab: string;
+  sortKey: string;
+  sortDir: SortDirection;
+  hiddenCols: Set<string>;
+  loading: boolean;
+  error: string;
+}
+
+interface Elements {
+  tabBar: HTMLElement | null;
+  status: HTMLElement | null;
+  thead: HTMLTableSectionElement | null;
+  tbody: HTMLElement | null;
+  toggleBar: HTMLElement | null;
+  exportBtn: HTMLButtonElement | null;
+}
+
+interface ResolvedLink {
+  href: string;
+  linkMode?: LinkMode;
+  browserKey?: string;
+}
+
+interface StickyColumnPlacement {
+  keyClass: string;
+  leftClass: string;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const ASC_ARROW = "\u25B2";
+const DESC_ARROW = "\u25BC";
+const INACTIVE_ARROW = "\u25BD";
+const HIDDEN_COLUMNS_KEY = "hiddenColumns";
+const STICKY_COLUMN_KEYS = ["code", "name", "net_cash_ratio"];
+const STICKY_COLUMN_CLASS_BY_KEY: Record<string, string> = {
+  code: "sticky-code",
+  name: "sticky-name",
+  net_cash_ratio: "sticky-net-cash-ratio",
+};
+const STICKY_LEFT_CLASS_BY_PREVIOUS_KEYS: Record<string, string> = {
+  "": "sticky-left-0",
+  code: "sticky-left-code",
+  name: "sticky-left-name",
+  net_cash_ratio: "sticky-left-net-cash-ratio",
+  "code|name": "sticky-left-code-name",
+  "code|net_cash_ratio": "sticky-left-code-net-cash-ratio",
+  "name|net_cash_ratio": "sticky-left-name-net-cash-ratio",
+};
+
+/* ------------------------------------------------------------------ */
+/*  State                                                              */
+/* ------------------------------------------------------------------ */
+
+let _config: StockTableConfig | null = null;
+
+const _state: State = {
+  rows: null,
+  priceDate: null,
+  targetPriceDate: null,
+  currentTab: "",
+  sortKey: "",
+  sortDir: "asc",
+  hiddenCols: new Set(),
+  loading: true,
+  error: "",
+};
+
+const _el: Elements = {
+  tabBar: null,
+  status: null,
+  thead: null,
+  tbody: null,
+  toggleBar: null,
+  exportBtn: null,
+};
+
+let _detailIndex: number = 0;
+const _detailMap: Record<number, string> = {};
+
+/* ------------------------------------------------------------------ */
+/*  Public API                                                         */
+/* ------------------------------------------------------------------ */
+
+export const StockTable = { init, getRowData, getBalanceSheetHistoryUrl };
+
+const _globalScope = globalThis as typeof globalThis & { StockTable?: typeof StockTable };
+_globalScope.StockTable = StockTable;
+
+/* ------------------------------------------------------------------ */
+/*  Initialisation                                                     */
+/* ------------------------------------------------------------------ */
+
+function getRowData(code: string): Record<string, unknown> | null {
+  if (!_state.rows) {
+    return null;
+  }
+  return _state.rows.find(function (r: StockRow): boolean { return r.code === code; }) ?? null;
+}
+
+function getBalanceSheetHistoryUrl(code: string): string | null {
+  if (!_config?.balanceSheetHistoryUrl || !code) {
+    return null;
+  }
+  const context: RenderContext = { githubPages: !!_config.githubPages };
+  if (typeof _config.balanceSheetHistoryUrl === "function") {
+    return _config.balanceSheetHistoryUrl(code, context);
+  }
+  return _config.balanceSheetHistoryUrl.replace("{code}", encodeURIComponent(code));
+}
+
+function init(config: StockTableConfig): void {
+  _config = config;
+  _state.rows = null;
+  _state.priceDate = null;
+  _state.targetPriceDate = null;
+  _state.sortKey = config.defaultSortKey;
+  _state.sortDir = config.defaultSortDirection;
+  _state.currentTab = "";
+  _state.loading = true;
+  _state.error = "";
+  _state.hiddenCols = _sanitizeHiddenCols(_loadHiddenCols());
+  _saveHiddenCols(_state.hiddenCols);
+
+  _el.tabBar = document.getElementById("tabBar");
+  _el.status = document.getElementById("statusMessage");
+  _el.thead = document.querySelector("#stockTable > thead");
+  _el.tbody = document.getElementById("tbody");
+  _el.toggleBar = document.getElementById("toggleBar");
+  _el.exportBtn = _createExportButton();
+
+  if (config.detailModal) {
+    _createModal();
+  }
+
+  _renderToggleChips();
+  _bindEvents();
+  _render();
+  void _loadData();
+  void _loadMetadata();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Data loading                                                       */
+/* ------------------------------------------------------------------ */
+
+async function _loadData(): Promise<void> {
+  if (!_config) {
+    return;
+  }
+
+  try {
+    const response: Response = await fetch(_config.dataUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+    const raw: unknown = await response.json();
+    _state.rows = _normalizeRows(raw);
+    _state.loading = false;
+    _state.error = "";
+
+    if (_config.tabMode && _state.rows.length > 0 && _state.rows[0]._tabKey !== undefined) {
+      _state.currentTab = _resolveDefaultTab(_state.rows);
+    }
+
+    _render();
+  } catch (err) {
+    console.error(err);
+    _state.loading = false;
+    _state.error = "データを読み込めませんでした。";
+    _render();
+  }
+}
+
+async function _loadMetadata(): Promise<void> {
+  if (!_config?.metadataUrl) {
+    return;
+  }
+
+  try {
+    const response: Response = await fetch(_config.metadataUrl, { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const raw: unknown = await response.json();
+    const metadata: PriceMetadata = _normalizePriceMetadata(raw);
+    _state.priceDate = metadata.priceDate;
+    _state.targetPriceDate = metadata.targetPriceDate;
+    if (!_state.loading && !_state.error) {
+      _render();
+    }
+  } catch (_err) {
+    _state.priceDate = null;
+    _state.targetPriceDate = null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Normalisation                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Accepts two shapes:
+ *   1) Flat array  →  [{ code, name, … }, …]
+ *   2) Tab object  →  { watch: { name, stocks: […] }, … }
+ *
+ * Tab rows receive a `_tabKey` property so the renderer can filter.
+ */
+function _normalizeRows(raw: unknown): StockRow[] {
+  if (Array.isArray(raw)) {
+    return raw as StockRow[];
+  }
+
+  if (raw && typeof raw === "object") {
+    const result: StockRow[] = [];
+    for (const [tabKey, ds] of Object.entries(raw as Record<string, unknown>)) {
+      const dataset = ds as { name?: string; stocks?: unknown[] } | null;
+      if (!dataset || !Array.isArray(dataset.stocks)) {
+        continue;
+      }
+      for (const stock of dataset.stocks) {
+        const row = stock as StockRow;
+        row._tabKey = tabKey;
+        row._tabName = dataset.name || tabKey;
+        result.push(row);
+      }
+    }
+    return result;
+  }
+
+  return [];
+}
+
+interface PriceMetadata {
+  priceDate: string | null;
+  targetPriceDate: string | null;
+}
+
+function _normalizePriceMetadata(raw: unknown): PriceMetadata {
+  if (!raw || typeof raw !== "object") {
+    return { priceDate: null, targetPriceDate: null };
+  }
+  const record = raw as Record<string, unknown>;
+  const priceDate = _normalizeDateString(record.price_date);
+  const targetPriceDate = _normalizeDateString(record.target_price_date) ?? priceDate;
+  return { priceDate, targetPriceDate };
+}
+
+function _normalizeDateString(value: unknown): string | null {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function _resolveDefaultTab(rows: StockRow[]): string {
+  if (!_config) {
+    return "";
+  }
+  const keys: string[] = [];
+  const seen: Record<string, boolean> = {};
+  for (const r of rows) {
+    if (r._tabKey && !seen[r._tabKey]) {
+      seen[r._tabKey] = true;
+      keys.push(r._tabKey);
+    }
+  }
+  if (_config.defaultTabKey && seen[_config.defaultTabKey]) {
+    return _config.defaultTabKey;
+  }
+  return keys.length > 0 ? keys[0] : "";
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rendering                                                          */
+/* ------------------------------------------------------------------ */
+
+function _render(): void {
+  _renderHead();
+  _renderTabs();
+  _renderSortButtons();
+  _renderToggleChips();
+
+  if (_state.loading) {
+    document.title = _config ? _config.defaultTitle : "";
+    _el.status!.textContent = "データを読み込み中です。";
+    _renderMessageRow("データを読み込み中です。");
+    _updateExportButton();
+    return;
+  }
+
+  if (_state.error) {
+    document.title = _config ? _config.defaultTitle : "";
+    _el.status!.textContent = _state.error;
+    _renderMessageRow(_state.error);
+    _updateExportButton();
+    return;
+  }
+
+  const visible: StockRow[] = _getVisibleRows();
+  const tabName: string = _getActiveTabName();
+  document.title = tabName ? tabName + " - " + _config!.defaultTitle : _config!.defaultTitle;
+  _el.status!.textContent = _formatStatus(visible.length);
+  _updateExportButton();
+
+  if (visible.length === 0) {
+    _renderMessageRow("該当する銘柄はありません。");
+    return;
+  }
+
+  _renderBody(visible);
+}
+
+function _formatStatus(visibleCount: number): string {
+  let message: string = visibleCount.toLocaleString("ja-JP") + " 件";
+  if (_state.priceDate) {
+    message += " / 株価基準日: " + _state.priceDate;
+  }
+  return message;
+}
+
+function _renderHead(): void {
+  if (!_el.thead) {
+    return;
+  }
+  const tr: HTMLTableRowElement = _el.thead.querySelector("tr") || document.createElement("tr");
+  tr.innerHTML = "";
+
+  for (const col of _config ? _config.columns : []) {
+    const th: HTMLTableCellElement = document.createElement("th");
+    th.scope = "col";
+    th.className = _getColumnClassName(col, "th");
+    if (col.title) {
+      th.title = col.title;
+    }
+    th.dataset.columnKey = col.key;
+
+    const btn: HTMLButtonElement = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sort-button";
+    btn.dataset.sortColumn = col.key;
+    btn.textContent = col.header + " ";
+    const arrow: HTMLSpanElement = document.createElement("span");
+    arrow.className = "arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = INACTIVE_ARROW;
+    btn.appendChild(arrow);
+    th.appendChild(btn);
+    tr.appendChild(th);
+  }
+
+  if (!_el.thead.contains(tr)) {
+    _el.thead.appendChild(tr);
+  }
+}
+
+function _renderBody(rows: StockRow[]): void {
+  if (!_el.tbody || !_config) {
+    return;
+  }
+  const cols: ColumnDef[] = _config.columns;
+  const context: RenderContext = { githubPages: !!_config.githubPages };
+
+  _el.tbody.innerHTML = rows.map(function (row: StockRow): string {
+    const priceUnavailable: boolean = _isPriceUnavailable(row);
+    const cells: string[] = cols.map(function (col: ColumnDef): string {
+      const extraCls: string = _metricCls(col, row);
+      const cautionCls: string = col.key === "price" && priceUnavailable ? " price-caution-cell" : "";
+      const cellClass: string = _getColumnClassName(col, "td", extraCls + cautionCls);
+      return '<td class="' + escapeHtml(cellClass) + '">' + _renderCellContent(col, row, context, priceUnavailable) + "</td>";
+    });
+    const rowClass: string = priceUnavailable ? ' class="price-unavailable"' : "";
+    return "<tr" + rowClass + ">" + cells.join("") + "</tr>";
+  }).join("");
+}
+
+function _isPriceUnavailable(row: StockRow): boolean {
+  const hasPriceField = Object.prototype.hasOwnProperty.call(row, "price");
+  const hasPriceDateField = Object.prototype.hasOwnProperty.call(row, "price_date");
+  if (!hasPriceField && !hasPriceDateField) {
+    return false;
+  }
+  const price = row.price;
+  if (typeof price !== "number" || !Number.isFinite(price)) {
+    return true;
+  }
+  if (!_state.targetPriceDate) {
+    return false;
+  }
+  const rowPriceDate = _normalizeDateString(row.price_date);
+  return rowPriceDate === null || rowPriceDate < _state.targetPriceDate;
+}
+
+function _renderCellContent(
+  col: ColumnDef,
+  row: StockRow,
+  context: RenderContext,
+  priceUnavailable: boolean,
+): string {
+  let renderedContent: string;
+
+  if (col.detailContent && _config?.detailModal) {
+    const detail: string | null = col.detailContent(row);
+    if (detail) {
+      const idx: number = _detailIndex++;
+      _detailMap[idx] = detail;
+      renderedContent = '<button class="detail-btn" type="button" data-detail-idx="' + idx + '">' + escapeHtml(col.render(row)) + "</button>";
+      return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+    }
+    renderedContent = col.render(row);
+    return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+  }
+
+  const content: string = col.render(row);
+  const resolvedLink: ResolvedLink | null = _resolveColumnLink(col, row, context);
+  if (resolvedLink === null) {
+    renderedContent = content;
+    return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+  }
+
+  const attrs: string[] = [
+    'href="' + escapeHtml(resolvedLink.href) + '"',
+    'target="_blank"',
+    'rel="noopener"',
+  ];
+  if (resolvedLink.linkMode === "browser" && resolvedLink.browserKey) {
+    attrs.push('data-browser="' + escapeHtml(resolvedLink.browserKey) + '"');
+  } else if (resolvedLink.linkMode === "yazi") {
+    attrs.push("data-yazi");
+  }
+
+  renderedContent = "<a " + attrs.join(" ") + ">" + escapeHtml(content) + "</a>";
+  return _renderPriceCaution(col, row, renderedContent, priceUnavailable);
+}
+
+function _renderPriceCaution(
+  col: ColumnDef,
+  row: StockRow,
+  renderedContent: string,
+  priceUnavailable: boolean,
+): string {
+  if (col.key !== "price" || !priceUnavailable) {
+    return renderedContent;
+  }
+
+  const label: string = _getPriceCautionLabel(row);
+  return '<span class="price-caution-value">' + renderedContent + '</span>'
+    + '<span class="price-caution-badge" role="img" aria-label="' + escapeHtml(label) + '" title="' + escapeHtml(label) + '">!</span>';
+}
+
+function _getPriceCautionLabel(row: StockRow): string {
+  const price = row.price;
+  if (typeof price !== "number" || !Number.isFinite(price)) {
+    return "株価未取得";
+  }
+
+  const rowPriceDate: string | null = _normalizeDateString(row.price_date);
+  if (rowPriceDate && _state.targetPriceDate) {
+    return "株価が古い: " + rowPriceDate + " / 基準日: " + _state.targetPriceDate;
+  }
+  if (_state.targetPriceDate) {
+    return "株価の日付未取得 / 基準日: " + _state.targetPriceDate;
+  }
+  return "株価未取得";
+}
+
+function _resolveColumnLink(col: ColumnDef, row: StockRow, context: RenderContext): ResolvedLink | null {
+  if (col.stockLink) {
+    return _resolveStockLink(col.stockLink, row, context);
+  }
+  if (!col.linkHref) {
+    return null;
+  }
+
+  const href: string | null = col.linkHref(row, context);
+  if (!href) {
+    return null;
+  }
+
+  return {
+    href,
+    linkMode: _resolveLinkMode(col, row, context),
+    browserKey: col.browserKey,
+  };
+}
+
+function _resolveLinkMode(col: ColumnDef, row: StockRow, context: RenderContext): LinkMode | undefined {
+  if (!col.linkMode) {
+    return undefined;
+  }
+  return typeof col.linkMode === "function" ? col.linkMode(row, context) : col.linkMode;
+}
+
+function _resolveStockLink(stockLink: StockLink, row: StockRow, context: RenderContext): ResolvedLink | null {
+  if (stockLink === "yazi") {
+    const code: string = String(row.code ?? "");
+    if (!code) {
+      return null;
+    }
+    if (context.githubPages) {
+      return null;
+    }
+    return {
+      href: "/open-yazi/" + encodeURIComponent(code),
+      linkMode: "yazi",
+    };
+  }
+
+  if (stockLink === "google") {
+    const name: string = String(row.name ?? "").trim();
+    if (!name) {
+      return null;
+    }
+    const href = _buildGoogleSearchUrl(name);
+    if (context.githubPages) {
+      return { href, linkMode: "direct" };
+    }
+    return {
+      href,
+      linkMode: "browser",
+      browserKey: stockLink,
+    };
+  }
+
+  const code: string = String(row.code ?? "");
+  if (!code) {
+    return null;
+  }
+
+  const href: string = stockLink === "monex"
+    ? _buildMonexUrl(code)
+    : stockLink === "shikiho"
+      ? _buildShikihoUrl(code)
+      : _buildBuffettCodeUrl(code);
+  if (context.githubPages) {
+    return { href, linkMode: "direct" };
+  }
+  return {
+    href,
+    linkMode: "browser",
+    browserKey: stockLink,
+  };
+}
+
+function _buildMonexUrl(code: string): string {
+  return "https://monex.ifis.co.jp/index.php?sa=report_zaimu&bcode=" + encodeURIComponent(code);
+}
+
+function _buildShikihoUrl(code: string): string {
+  return "https://shikiho.toyokeizai.net/stocks/" + encodeURIComponent(code) + "/shikiho";
+}
+
+function _buildBuffettCodeUrl(code: string): string {
+  return "https://www.buffett-code.com/company/" + encodeURIComponent(code) + "/";
+}
+
+function _buildGoogleSearchUrl(name: string): string {
+  return "https://www.google.com/search?q=" + encodeURIComponent(name);
+}
+
+function _renderMessageRow(message: string): void {
+  if (!_el.tbody || !_config) {
+    return;
+  }
+  const visibleCount: number = _config.columns.length - _state.hiddenCols.size;
+  _el.tbody.innerHTML = '<tr><td class="table-message" colspan="' + visibleCount + '">' + escapeHtml(message) + "</td></tr>";
+}
+
+function _renderTabs(): void {
+  if (!_el.tabBar || !_config || !_config.tabMode || !_state.rows) {
+    if (_el.tabBar) {
+      _el.tabBar.innerHTML = "";
+    }
+    return;
+  }
+
+  const tabMap: Record<string, string> = {};
+  for (const r of _state.rows) {
+    if (r._tabKey && !tabMap[r._tabKey]) {
+      tabMap[r._tabKey] = r._tabName || r._tabKey;
+    }
+  }
+  const entries: [string, string][] = Object.entries(tabMap);
+
+  _el.tabBar.innerHTML = entries.map(function (pair: [string, string]): string {
+    const isActive: boolean = pair[0] === _state.currentTab;
+    return '<button class="tab' + (isActive ? " active" : "") + '" type="button" data-tab-key="' + escapeHtml(pair[0]) + '" aria-selected="' + String(isActive) + '">' + escapeHtml(pair[1]) + "</button>";
+  }).join("");
+}
+
+function _renderSortButtons(): void {
+  if (!_el.thead) {
+    return;
+  }
+  _el.thead.querySelectorAll(".sort-button").forEach(function (btn: Element): void {
+    const key: string | undefined = (btn as HTMLButtonElement).dataset.sortColumn;
+    const isActive: boolean = _state.sortKey === key;
+    const arrow: Element | null = btn.querySelector(".arrow");
+    if (arrow) {
+      arrow.textContent = isActive ? (_state.sortDir === "asc" ? ASC_ARROW : DESC_ARROW) : INACTIVE_ARROW;
+    }
+    btn.classList.toggle("active", isActive);
+    const th: HTMLElement | null = btn.closest("th");
+    if (th) {
+      th.setAttribute("aria-sort", isActive ? (_state.sortDir === "asc" ? "ascending" : "descending") : "none");
+    }
+  });
+}
+
+function _renderToggleChips(): void {
+  if (!_el.toggleBar || !_config) {
+    return;
+  }
+  const toggleable: ColumnDef[] = _getHideableColumns();
+
+  _el.toggleBar.innerHTML = toggleable.map(function (col: ColumnDef): string {
+    const isActive: boolean = !_isColumnHidden(col.key);
+    return '<button class="toggle-chip' + (isActive ? " active" : "") + '" type="button" data-toggle-column="' + escapeHtml(col.key) + '">' + escapeHtml(col.header) + "</button>";
+  }).join("");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Metric colouring                                                   */
+/* ------------------------------------------------------------------ */
+
+function _metricCls(col: ColumnDef, row: StockRow): string {
+  if (!_config) {
+    return "";
+  }
+  const t: MetricThreshold | undefined = _config.metricThresholds[col.key];
+  if (!t) {
+    return "";
+  }
+  const raw: number | null | undefined = col.sortValue ? col.sortValue(row) : null;
+  if (raw === null || raw === undefined) {
+    return " metric-cell";
+  }
+  if (t.good && t.good(raw)) {
+    return " metric-cell metric-good";
+  }
+  if (t.bad && t.bad(raw)) {
+    return " metric-cell metric-bad";
+  }
+  return " metric-cell";
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sorting & filtering                                                */
+/* ------------------------------------------------------------------ */
+
+function _getVisibleRows(): StockRow[] {
+  if (!_state.rows || !_config) {
+    return [];
+  }
+  let rows: StockRow[] = _state.rows;
+
+  if (_config.tabMode && _state.currentTab) {
+    rows = rows.filter(function (r: StockRow): boolean { return r._tabKey === _state.currentTab; });
+  }
+
+  return rows.slice().sort(function (a: StockRow, b: StockRow): number {
+    const col: ColumnDef | null = _findColumn(_state.sortKey);
+    if (!col || !col.sortValue) {
+      return 0;
+    }
+    const av: number | null = col.sortValue(a);
+    const bv: number | null = col.sortValue(b);
+    const dir: number = _state.sortDir === "asc" ? 1 : -1;
+
+    if (av === null && bv === null) {
+      return (a.code || "").localeCompare(b.code || "", "ja", { numeric: true });
+    }
+    if (av === null) {
+      return 1;
+    }
+    if (bv === null) {
+      return -1;
+    }
+    return (av - bv) * dir;
+  });
+}
+
+function _getActiveTabName(): string {
+  if (!_state.rows || !_state.currentTab) {
+    return "";
+  }
+  const row: StockRow | undefined = _state.rows.find(function (r: StockRow): boolean { return r._tabKey === _state.currentTab; });
+  return row ? row._tabName || "" : "";
+}
+
+function _findColumn(key: string): ColumnDef | null {
+  if (!_config) {
+    return null;
+  }
+  for (const col of _config.columns) {
+    if (col.key === key) {
+      return col;
+    }
+  }
+  return null;
+}
+
+function _getHideableColumns(): ColumnDef[] {
+  if (!_config) {
+    return [];
+  }
+  return _config.columns.filter(function (col: ColumnDef): boolean {
+    return _isColumnHideable(col);
+  });
+}
+
+function _isColumnHideable(col: ColumnDef): boolean {
+  return !!_config && !!col.toggleable && col.key !== _config.defaultSortKey;
+}
+
+function _sanitizeHiddenCols(cols: Set<string>): Set<string> {
+  const hideableKeys: Set<string> = new Set(_getHideableColumns().map(function (col: ColumnDef): string {
+    return col.key;
+  }));
+  return new Set(Array.from(cols).filter(function (key: string): boolean {
+    return hideableKeys.has(key);
+  }));
+}
+
+function _isColumnHidden(key: string): boolean {
+  return _state.hiddenCols.has(key);
+}
+
+function _getColumnClassName(col: ColumnDef, element: "th" | "td", extraClass?: string): string {
+  const classes: string[] = [];
+  if (element === "td") {
+    classes.push(col.type);
+  }
+  if (col.cssClass) {
+    classes.push(col.cssClass);
+  }
+  if (col.isPosition) {
+    classes.push("column-position");
+  }
+  if (_isColumnHidden(col.key)) {
+    classes.push("hidden-col");
+  }
+  const stickyPlacement: StickyColumnPlacement | null = _getStickyColumnPlacement(col);
+  if (stickyPlacement) {
+    classes.push("sticky-col", stickyPlacement.keyClass, stickyPlacement.leftClass);
+  }
+  if (extraClass) {
+    classes.push(extraClass.trim());
+  }
+  return classes.filter(Boolean).join(" ");
+}
+
+function _getStickyColumnPlacement(col: ColumnDef): StickyColumnPlacement | null {
+  if (!_config || _isColumnHidden(col.key) || !_isStickyColumnKey(col.key)) {
+    return null;
+  }
+
+  const stickyColumns: ColumnDef[] = _config.columns.filter(function (candidate: ColumnDef): boolean {
+    return !_isColumnHidden(candidate.key) && _isStickyColumnKey(candidate.key);
+  });
+  const index: number = stickyColumns.findIndex(function (candidate: ColumnDef): boolean {
+    return candidate.key === col.key;
+  });
+  if (index < 0) {
+    return null;
+  }
+
+  return {
+    keyClass: STICKY_COLUMN_CLASS_BY_KEY[col.key],
+    leftClass: _getStickyLeftClass(stickyColumns, index),
+  };
+}
+
+function _isStickyColumnKey(key: string): boolean {
+  return STICKY_COLUMN_KEYS.includes(key);
+}
+
+function _getStickyLeftClass(stickyColumns: ColumnDef[], index: number): string {
+  const previousKeys: string[] = stickyColumns.slice(0, index).map(function (col: ColumnDef): string {
+    return col.key;
+  }).sort(function (a: string, b: string): number {
+    return STICKY_COLUMN_KEYS.indexOf(a) - STICKY_COLUMN_KEYS.indexOf(b);
+  });
+  return STICKY_LEFT_CLASS_BY_PREVIOUS_KEYS[previousKeys.join("|")] || "sticky-left-0";
+}
+
+function _resetSortToDefault(): void {
+  if (!_config) {
+    return;
+  }
+  _state.sortKey = _config.defaultSortKey;
+  _state.sortDir = _config.defaultSortDirection;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Event binding                                                      */
+/* ------------------------------------------------------------------ */
+
+function _bindEvents(): void {
+  /* sort buttons */
+  document.addEventListener("click", function (e: MouseEvent): void {
+    const btn: Element | null = e.target instanceof Element ? e.target.closest(".sort-button") : null;
+    if (!btn) {
+      return;
+    }
+    const key: string | undefined = (btn as HTMLButtonElement).dataset.sortColumn;
+    if (!key) {
+      return;
+    }
+    if (_state.sortKey === key) {
+      _state.sortDir = _state.sortDir === "asc" ? "desc" : "asc";
+    } else {
+      _state.sortKey = key;
+      _state.sortDir = key === _config!.defaultSortKey ? _config!.defaultSortDirection : "asc";
+    }
+    _render();
+  });
+
+  /* export csv */
+  if (_el.exportBtn) {
+    _el.exportBtn.addEventListener("click", function (): void {
+      _exportCsv();
+    });
+  }
+
+  /* toggle chips */
+  if (_el.toggleBar) {
+    _el.toggleBar.addEventListener("click", function (e: MouseEvent): void {
+      const chip: Element | null = e.target instanceof Element ? e.target.closest("[data-toggle-column]") : null;
+      if (!chip) {
+        return;
+      }
+      const col: string | undefined = (chip as HTMLElement).dataset.toggleColumn;
+      if (!col) {
+        return;
+      }
+      const columnDef: ColumnDef | null = _findColumn(col);
+      if (!columnDef || !_isColumnHideable(columnDef)) {
+        return;
+      }
+      if (_state.hiddenCols.has(col)) {
+        _state.hiddenCols.delete(col);
+      } else {
+        _state.hiddenCols.add(col);
+        if (_state.sortKey === col) {
+          _resetSortToDefault();
+        }
+      }
+      _state.hiddenCols = _sanitizeHiddenCols(_state.hiddenCols);
+      _saveHiddenCols(_state.hiddenCols);
+      _render();
+    });
+  }
+
+  /* tabs */
+  if (_el.tabBar) {
+    _el.tabBar.addEventListener("click", function (e: MouseEvent): void {
+      const tab: Element | null = e.target instanceof Element ? e.target.closest("[data-tab-key]") : null;
+      if (!tab) {
+        return;
+      }
+      const key: string | undefined = (tab as HTMLElement).dataset.tabKey;
+      if (!key) {
+        return;
+      }
+      _state.currentTab = key;
+      _resetSortToDefault();
+      _render();
+    });
+  }
+
+  /* browser link interception */
+  document.addEventListener("click", function (e: MouseEvent): void {
+    const link: Element | null = e.target instanceof Element ? e.target.closest("a[data-browser]") : null;
+    if (!link) {
+      return;
+    }
+    const browserKey: string = (link as HTMLAnchorElement).getAttribute("data-browser") || "";
+    const url: string = (link as HTMLAnchorElement).href;
+    e.preventDefault();
+    fetch("/open?browser=" + encodeURIComponent(browserKey) + "&url=" + encodeURIComponent(url))
+      .then(function (response: Response): void {
+        if (!response.ok) {
+          window.open(url, "_blank", "noopener");
+        }
+      })
+      .catch(function (): void {
+        window.open(url, "_blank", "noopener");
+      });
+  });
+
+  /* yazi link interception */
+  document.addEventListener("click", function (e: MouseEvent): void {
+    const link: Element | null = e.target instanceof Element ? e.target.closest("a[data-yazi]") : null;
+    if (!link) {
+      return;
+    }
+    e.preventDefault();
+    fetch((link as HTMLAnchorElement).href).catch(function (): void { /* ignore */ });
+  });
+
+  /* detail modal */
+  document.addEventListener("click", function (e: MouseEvent): void {
+    const btn: Element | null = e.target instanceof Element ? e.target.closest(".detail-btn") : null;
+    if (!btn) {
+      return;
+    }
+    const idx: string | undefined = (btn as HTMLElement).dataset.detailIdx;
+    if (idx === undefined) {
+      return;
+    }
+    const content: string | undefined = _detailMap[Number(idx)];
+    if (content === undefined) {
+      return;
+    }
+    _openDetailModal(content);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Detail modal                                                       */
+/* ------------------------------------------------------------------ */
+
+function _createModal(): void {
+  const modal: HTMLDivElement = document.createElement("div");
+  modal.id = "detail-modal";
+  modal.className = "detail-modal hidden";
+  modal.innerHTML =
+    '<div class="detail-modal-backdrop"></div>' +
+    '<div class="detail-modal-content">' +
+    '<button class="detail-modal-close" type="button">&times;</button>' +
+    '<div class="detail-modal-body"></div>' +
+    "</div>";
+  document.body.appendChild(modal);
+
+  const backdrop: Element | null = modal.querySelector(".detail-modal-backdrop");
+  const closeBtn: Element | null = modal.querySelector(".detail-modal-close");
+  if (backdrop) {
+    backdrop.addEventListener("click", _closeDetailModal);
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener("click", _closeDetailModal);
+  }
+  document.addEventListener("keydown", function (e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      _closeDetailModal();
+    }
+  });
+}
+
+function _openDetailModal(html: string): void {
+  const modal: HTMLElement | null = document.getElementById("detail-modal");
+  if (!modal) {
+    return;
+  }
+  const body: Element | null = modal.querySelector(".detail-modal-body");
+  if (body) {
+    body.innerHTML = html;
+  }
+  modal.classList.remove("hidden");
+}
+
+function _closeDetailModal(): void {
+  const modal: HTMLElement | null = document.getElementById("detail-modal");
+  if (!modal) {
+    return;
+  }
+  modal.classList.add("hidden");
+  const body: Element | null = modal.querySelector(".detail-modal-body");
+  if (body) {
+    body.innerHTML = "";
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  LocalStorage helpers                                               */
+/* ------------------------------------------------------------------ */
+
+function _loadHiddenCols(): Set<string> {
+  try {
+    const stored: string | null = localStorage.getItem(HIDDEN_COLUMNS_KEY);
+    if (stored) {
+      return new Set(JSON.parse(stored) as string[]);
+    }
+  } catch (_e) {
+    localStorage.removeItem(HIDDEN_COLUMNS_KEY);
+  }
+  return new Set();
+}
+
+function _saveHiddenCols(cols: Set<string>): void {
+  try {
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(Array.from(cols)));
+  } catch (_e) {
+    /* storage full or blocked → silently degrade */
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/* ------------------------------------------------------------------ */
+/*  CSV Export                                                          */
+/* ------------------------------------------------------------------ */
+
+function _createExportButton(): HTMLButtonElement | null {
+  const toolbar: HTMLElement | null = _el.toggleBar?.parentElement ?? null;
+  if (!toolbar) {
+    return null;
+  }
+  const btn: HTMLButtonElement = document.createElement("button");
+  btn.type = "button";
+  btn.className = "export-csv-btn";
+  btn.textContent = "CSV";
+  btn.style.display = "none";
+  toolbar.appendChild(btn);
+  return btn;
+}
+
+function _updateExportButton(): void {
+  if (!_el.exportBtn) {
+    return;
+  }
+  const visible: StockRow[] = _getVisibleRows();
+  _el.exportBtn.style.display = visible.length > 0 ? "" : "none";
+}
+
+function _exportCsv(): void {
+  if (!_config || !_state.rows) {
+    return;
+  }
+
+  const visible: StockRow[] = _getVisibleRows();
+  if (visible.length === 0) {
+    return;
+  }
+
+  const visibleCols: ColumnDef[] = _config.columns.filter(
+    (col: ColumnDef): boolean => !_isColumnHidden(col.key),
+  );
+
+  const header: string = visibleCols
+    .map((col: ColumnDef): string => _csvEscape(col.header))
+    .join(",");
+
+  const rows: string[] = visible.map((row: StockRow): string => {
+    return visibleCols
+      .map((col: ColumnDef): string => _csvEscape(_stripHtml(col.render(row))))
+      .join(",");
+  });
+
+  const csv: string = "\uFEFF" + header + "\n" + rows.join("\n");
+
+  const blob: Blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url: string = URL.createObjectURL(blob);
+  const now: Date = new Date();
+  const ts: string = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    "_",
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("");
+  const filename: string = _config.defaultTitle.replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+/g, "_") + "_" + ts + ".csv";
+
+  const anchor: HTMLAnchorElement = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function _stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&nbsp;", " ");
+}
+
+function _csvEscape(value: string): string {
+  if (value.includes('"') || value.includes(",") || value.includes("\n") || value.includes("\r")) {
+    return '"' + value.replaceAll('"', '""') + '"';
+  }
+  return value;
+}

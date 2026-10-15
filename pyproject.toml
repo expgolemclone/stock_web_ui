@@ -1,0 +1,23 @@
+[project]
+name = "stock-web-ui"
+version = "0.1.0"
+description = "Shared web UI for stock screening and portfolio viewing"
+requires-python = ">=3.13"
+
+[build-system]
+requires = ["maturin>=1.0,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "stock_web_ui._core"
+python-source = "src"
+manifest-path = "rust/Cargo.toml"
+features = ["python"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
